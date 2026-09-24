@@ -134,6 +134,8 @@ export async function initDb() {
         CREATE TABLE IF NOT EXISTS merchants (
           id TEXT PRIMARY KEY,
           email TEXT UNIQUE NOT NULL,
+          first_name TEXT,
+          last_name TEXT,
           business_name TEXT NOT NULL,
           password_hash TEXT NOT NULL,
           role TEXT NOT NULL DEFAULT 'merchant',
@@ -146,11 +148,34 @@ export async function initDb() {
           updated_at TEXT NOT NULL
         )
       `);
+      const mchInfo = await query("PRAGMA table_info(merchants)");
+      const mchCols = new Set(mchInfo.rows.map(r => r.name));
+      if (!mchCols.has('first_name')) {
+        await query("ALTER TABLE merchants ADD COLUMN first_name TEXT");
+      }
+      if (!mchCols.has('last_name')) {
+        await query("ALTER TABLE merchants ADD COLUMN last_name TEXT");
+      }
+
       await query("CREATE INDEX IF NOT EXISTS idx_merchants_email ON merchants(email)");
       await query("CREATE INDEX IF NOT EXISTS idx_merchants_api_key ON merchants(api_key)");
       await query("CREATE INDEX IF NOT EXISTS idx_invoices_merchant ON invoices(merchant_id)");
       await query("CREATE INDEX IF NOT EXISTS idx_payment_links_merchant ON payment_links(merchant_id)");
       await query("CREATE INDEX IF NOT EXISTS idx_invoices_customer_email ON invoices(customer_email)");
+
+      await query(`
+        CREATE TABLE IF NOT EXISTS otps (
+          id TEXT PRIMARY KEY,
+          email TEXT NOT NULL,
+          otp_hash TEXT NOT NULL,
+          purpose TEXT NOT NULL,
+          payload TEXT,
+          attempts INTEGER DEFAULT 0,
+          expires_at TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        )
+      `);
+      await query("CREATE INDEX IF NOT EXISTS idx_otps_email_purpose ON otps(email, purpose)");
 
       await query(`
         CREATE TABLE IF NOT EXISTS email_logs (
@@ -205,6 +230,8 @@ export async function initDb() {
         CREATE TABLE IF NOT EXISTS merchants (
           id TEXT PRIMARY KEY,
           email TEXT UNIQUE NOT NULL,
+          first_name TEXT,
+          last_name TEXT,
           business_name TEXT NOT NULL,
           password_hash TEXT NOT NULL,
           role TEXT NOT NULL DEFAULT 'merchant',
@@ -217,6 +244,21 @@ export async function initDb() {
           updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )
       `);
+      await query("ALTER TABLE merchants ADD COLUMN IF NOT EXISTS first_name TEXT");
+      await query("ALTER TABLE merchants ADD COLUMN IF NOT EXISTS last_name TEXT");
+      await query(`
+        CREATE TABLE IF NOT EXISTS otps (
+          id TEXT PRIMARY KEY,
+          email TEXT NOT NULL,
+          otp_hash TEXT NOT NULL,
+          purpose TEXT NOT NULL,
+          payload JSONB,
+          attempts INT DEFAULT 0,
+          expires_at TIMESTAMPTZ NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+      `);
+      await query("CREATE INDEX IF NOT EXISTS idx_otps_email_purpose ON otps(email, purpose)");
       await query(`
         CREATE TABLE IF NOT EXISTS email_logs (
           id TEXT PRIMARY KEY,

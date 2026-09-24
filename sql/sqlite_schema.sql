@@ -1,6 +1,8 @@
 CREATE TABLE IF NOT EXISTS merchants (
   id TEXT PRIMARY KEY,
   email TEXT UNIQUE NOT NULL,
+  first_name TEXT,
+  last_name TEXT,
   business_name TEXT NOT NULL,
   password_hash TEXT NOT NULL,
   role TEXT NOT NULL DEFAULT 'merchant',
@@ -11,6 +13,17 @@ CREATE TABLE IF NOT EXISTS merchants (
   wallet_id TEXT NOT NULL REFERENCES wallets(id),
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS otps (
+  id TEXT PRIMARY KEY,
+  email TEXT NOT NULL,
+  otp_hash TEXT NOT NULL,
+  purpose TEXT NOT NULL,
+  payload TEXT,
+  attempts INTEGER DEFAULT 0,
+  expires_at TEXT NOT NULL,
+  created_at TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS invoices (
@@ -142,4 +155,5 @@ CREATE INDEX IF NOT EXISTS idx_ledger_wallet ON ledger(wallet_id);
 CREATE INDEX IF NOT EXISTS idx_sweeps_invoice_id ON sweeps(invoice_id);
 CREATE INDEX IF NOT EXISTS idx_email_logs_invoice ON email_logs(invoice_id);
 CREATE INDEX IF NOT EXISTS idx_email_logs_merchant ON email_logs(merchant_id);
+CREATE INDEX IF NOT EXISTS idx_otps_email_purpose ON otps(email, purpose);
 

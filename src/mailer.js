@@ -472,6 +472,94 @@ export async function notifyInvoiceCreated({ invoice, merchant }) {
 }
 
 /**
+ * Builds HTML template for OTP verification emails
+ */
+export function buildOtpEmailHtml({ otp, purpose = 'signup', recipientName = '' }) {
+  const isSignup = purpose === 'signup';
+  const title = isSignup ? 'Confirm Your Registration' : 'Account Security Verification';
+  const subtitle = isSignup
+    ? 'Verify your email address to complete your Payrail Merchant account setup.'
+    : 'A sign-in attempt was initiated for your Payrail Merchant account.';
+  const note = isSignup
+    ? 'Enter this 6-digit code in your browser to verify your identity and activate your account.'
+    : 'Enter this 6-digit one-time code to complete your login.';
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${title}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b111e; color: #f1f5f9; margin: 0; padding: 24px; }
+    .card { max-width: 520px; margin: 0 auto; background: #131e31; border: 1px solid #1e293b; border-radius: 14px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+    .header { background: #1e293b; padding: 26px; text-align: center; border-bottom: 2px solid #38bdf8; }
+    .header h1 { margin: 0; font-size: 20px; font-weight: 700; color: #f8fafc; letter-spacing: -0.3px; }
+    .badge { display: inline-block; background: #0c4a6e; color: #38bdf8; font-weight: 700; font-size: 12px; padding: 4px 12px; border-radius: 20px; margin-top: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .content { padding: 32px 28px; text-align: center; }
+    .greeting { font-size: 16px; color: #cbd5e1; margin-bottom: 12px; text-align: left; }
+    .msg { font-size: 14px; color: #94a3b8; line-height: 1.6; margin-bottom: 24px; text-align: left; }
+    .otp-container { background: #0b1322; border: 2px dashed #38bdf8; border-radius: 12px; padding: 20px 16px; margin: 24px 0; text-align: center; }
+    .otp-label { font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-weight: 600; }
+    .otp-code { font-family: 'Courier New', Courier, monospace; font-size: 38px; font-weight: 900; letter-spacing: 10px; color: #38bdf8; text-indent: 10px; }
+    .expiry { font-size: 12px; color: #f59e0b; margin-top: 10px; font-weight: 600; }
+    .warning-box { background: #1e1b2e; border-left: 3px solid #f43f5e; padding: 14px 16px; border-radius: 6px; text-align: left; font-size: 13px; color: #cbd5e1; line-height: 1.5; margin: 24px 0 12px; }
+    .footer { text-align: center; font-size: 12px; color: #64748b; padding: 20px; border-top: 1px solid #1e293b; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <h1>Payrail Gateway</h1>
+      <div class="badge">Security Verification</div>
+    </div>
+    <div class="content">
+      ${recipientName ? `<div class="greeting">Hello <strong>${recipientName}</strong>,</div>` : '<div class="greeting">Hello,</div>'}
+      <div class="msg">
+        ${subtitle}<br>${note}
+      </div>
+
+      <div class="otp-container">
+        <div class="otp-label">Your 6-Digit One-Time Security Code</div>
+        <div class="otp-code">${otp}</div>
+        <div class="expiry">⏱ Valid for 10 minutes only</div>
+      </div>
+
+      <div class="warning-box">
+        <strong>Security Tip:</strong> Never share this verification code with anyone, including platform administrators. Payrail staff will never ask for your code.
+      </div>
+    </div>
+    <div class="footer">
+      Payrail Crypto Payment Gateway &bull; High Security Infrastructure<br>
+      If you did not make this request, you can safely disregard this email.
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
+/**
+ * Dispatches an OTP verification code via configured email transport
+ */
+export async function sendOtpEmail({ to, otp, purpose = 'signup', recipientName = '' }) {
+  const isSignup = purpose === 'signup';
+  const subject = isSignup
+    ? `🔐 Payrail: Your Verification Code is ${otp}`
+    : `🔐 Payrail: Your Sign In Security Code is ${otp}`;
+  const html = buildOtpEmailHtml({ otp, purpose, recipientName });
+  const text = `Your Payrail ${isSignup ? 'registration' : 'login'} verification code is: ${otp}. It will expire in 10 minutes. Never share this code with anyone.`;
+
+  return await sendEmail({
+    to,
+    subject,
+    html,
+    text,
+    recipientType: 'merchant',
+    template: `otp_${purpose}`,
+  });
+}
+
+/**
  * Query email audit logs
  */
 export async function getEmailLogs({ limit = 50, merchantId = null, invoiceId = null } = {}) {

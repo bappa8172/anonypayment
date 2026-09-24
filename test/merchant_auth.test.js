@@ -8,7 +8,17 @@ process.env.SQLITE_DB_PATH = path.join(__dirname, '..', 'data', 'test_gateway.db
 
 import { initDb, query } from '../src/db.js';
 import { initEVM } from '../src/evm.js';
-import { registerMerchant, loginUser, verifySessionToken, getMerchantByApiKey } from '../src/auth.js';
+import {
+  registerMerchant,
+  loginUser,
+  verifySessionToken,
+  getMerchantByApiKey,
+  requestSignupOtp,
+  verifySignupOtp,
+  requestLoginOtp,
+  verifyLoginOtp,
+  hashOtp,
+} from '../src/auth.js';
 import { createInvoice, getInvoice, listInvoices, createPaymentLink, listPaymentLinks } from '../src/invoices.js';
 import { getWalletBalances, creditWalletBalance, withdrawCrypto } from '../src/wallet.js';
 
@@ -146,3 +156,145 @@ test('Merchant & Security: 4. Merchant API Key authentication', async () => {
   const invalid = await getMerchantByApiKey('mch_live_invalidkey1234567890abcdef');
   assert.equal(invalid, null);
 });
+
+test('Merchant & Security: 5. Signup with OTP verification & security limits', async () => {
+  const email = `otp_signup_${Date.now()}@fintech.org`;
+  const firstName = 'John';
+  const lastName = 'Doe';
+  const businessName = 'Doe Global Ventures';
+  const password = 'SuperSecurePassword2026!';
+
+  // Request signup OTP
+  const reqRes = await requestSignupOtp({
+    firstName,
+    lastName,
+    businessName,
+    email,
+    password,
+  });
+
+  assert.equal(reqRes.success, true);
+  assert.equal(reqRes.email, email);
+  assert.equal(reqRes.cooldownSeconds, 60);
+
+  // 60-second cooldown is enforced
+  await assert.rejects(
+    async () => {
+      await requestSignupOtp({
+        firstName,
+        lastName,
+        businessName,
+        email,
+        password,
+      });
+    },
+    /Please wait \d+s before requesting a new verification code/
+  );
+
+  // Find the generated OTP from database by testing candidate digits
+  const otpRows = await query('SELECT * FROM otps WHERE email = $1 AND purpose = "signup"', [email]);
+  assert.equal(otpRows.rows.length, 1);
+  const otpRecord = otpRows.rows[0];
+
+  // Test brute-force protection: invalid code is rejected and attempts incremented
+  await assert.rejects(
+    async () => {
+      await verifySignupOtp({ email, otp: '000000' });
+    },
+    /Invalid verification code/
+  );
+
+  const updatedRows = await query('SELECT attempts FROM otps WHERE id = $1', [otpRecord.id]);
+  assert.equal(updatedRows.rows[0].attempts, 1);
+
+  // Discover the valid 6-digit OTP code by matching hashOtp
+  let validOtp = null;
+  for (let c = 100000; c <= 999999; c++) {
+    if (hashOtp(email, c.toString()) === otpRecord.otp_hash) {
+      validOtp = c.toString();
+      break;
+    }
+  }
+  assert.ok(validOtp, 'Valid 6-digit OTP code must be discoverable from hash');
+
+  // Verify signup OTP
+  const verifyRes = await verifySignupOtp({ email, otp: validOtp });
+  assert.ok(verifyRes.user);
+  assert.ok(verifyRes.token);
+  assert.equal(verifyRes.user.firstName, firstName);
+  assert.equal(verifyRes.user.lastName, lastName);
+  assert.equal(verifyRes.user.businessName, businessName);
+  assert.equal(verifyRes.user.email, email);
+
+  // Verify merchant in database has first_name and last_name
+  const mchDb = await query('SELECT * FROM merchants WHERE email = $1', [email]);
+  assert.equal(mchDb.rows[0].first_name, firstName);
+  assert.equal(mchDb.rows[0].last_name, lastName);
+
+  // OTP record is purged after successful verification
+  const afterVerify = await query('SELECT * FROM otps WHERE email = $1 AND purpose = "signup"', [email]);
+  assert.equal(afterVerify.rows.length, 0);
+});
+
+test('Merchant & Security: 6. Login with 2FA OTP verification', async () => {
+  const email = `otp_login_${Date.now()}@cybercorp.io`;
+  const firstName = 'Alice';
+  const lastName = 'Smith';
+  const businessName = 'Alice Cyber Corp';
+  const password = 'AlicePassword2026!';
+
+  await registerMerchant({
+    email,
+    businessName,
+    firstName,
+    lastName,
+    password,
+  });
+
+  // Invalid password rejected upfront
+  await assert.rejects(
+    async () => {
+      await requestLoginOtp({ email, password: 'WrongPassword123!' });
+    },
+    { message: 'Invalid email or password' }
+  );
+
+  // Valid password triggers OTP dispatch
+  const reqRes = await requestLoginOtp({ email, password });
+  assert.equal(reqRes.success, true);
+  assert.equal(reqRes.email, email);
+
+  // Find login OTP record
+  const otpRows = await query('SELECT * FROM otps WHERE email = $1 AND purpose = "login"', [email]);
+  assert.equal(otpRows.rows.length, 1);
+  const otpRecord = otpRows.rows[0];
+
+  let validOtp = null;
+  for (let c = 100000; c <= 999999; c++) {
+    if (hashOtp(email, c.toString()) === otpRecord.otp_hash) {
+      validOtp = c.toString();
+      break;
+    }
+  }
+  assert.ok(validOtp);
+
+  // Wrong OTP fails
+  await assert.rejects(
+    async () => {
+      await verifyLoginOtp({ email, otp: '111111' });
+    },
+    /Invalid security code/
+  );
+
+  // Correct OTP succeeds
+  const loginRes = await verifyLoginOtp({ email, otp: validOtp });
+  assert.ok(loginRes.token);
+  assert.equal(loginRes.user.email, email);
+  assert.equal(loginRes.user.firstName, firstName);
+  assert.equal(loginRes.user.lastName, lastName);
+
+  // OTP record is purged
+  const afterLogin = await query('SELECT * FROM otps WHERE email = $1 AND purpose = "login"', [email]);
+  assert.equal(afterLogin.rows.length, 0);
+});
+

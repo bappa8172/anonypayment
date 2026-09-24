@@ -916,52 +916,115 @@ app.post('/api/crypto-webhook', express.raw({ type: 'application/json' }), (req,
         <button type="button" class="auth-toggle-btn" id="auth-tab-btn-register" onclick="switchAuthTab('register')">Register Business (No Docs)</button>
       </div>
 
-      <!-- Sign In Form -->
-      <form id="form-login" style="display: flex; flex-direction: column; gap: 14px;">
-        <div class="form-group">
-          <label>Email Address</label>
-          <input type="email" id="login-email" class="form-input" required placeholder="merchant@business.com">
-        </div>
-        <div class="form-group">
-          <label>Password</label>
-          <input type="password" id="login-password" class="form-input" required placeholder="••••••••••••">
-        </div>
-        <div id="login-status" class="alert-box" style="display: none;"></div>
-        <button type="submit" class="btn btn-primary" id="btn-submit-login" style="padding: 12px; font-weight: 700;">Sign In to Dashboard</button>
+      <!-- Sign In Container -->
+      <div id="auth-signin-container">
+        <!-- Step 1: Login Credentials -->
+        <form id="form-login" style="display: flex; flex-direction: column; gap: 14px;">
+          <div class="form-group">
+            <label>Email Address</label>
+            <input type="email" id="login-email" class="form-input" required placeholder="merchant@business.com">
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="login-password" class="form-input" required placeholder="••••••••••••">
+          </div>
+          <div id="login-status" class="alert-box" style="display: none;"></div>
+          <button type="submit" class="btn btn-primary" id="btn-submit-login" style="padding: 12px; font-weight: 700;">Continue with Security Code →</button>
 
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; font-size: 0.8rem; color: var(--text-muted);">
-          <span>Platform Administrator?</span>
-          <button type="button" class="btn-text" id="btn-quick-admin-login" style="color: var(--accent-cyan);">Quick Admin Login →</button>
-        </div>
-      </form>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; font-size: 0.8rem; color: var(--text-muted);">
+            <span>Platform Administrator?</span>
+            <button type="button" class="btn-text" id="btn-quick-admin-login" style="color: var(--accent-cyan);">Quick Admin Login →</button>
+          </div>
+        </form>
 
-      <!-- Instant Business Registration Form (No KYC, No Docs) -->
-      <form id="form-register" style="display: none; flex-direction: column; gap: 14px;">
-        <div class="auth-features-list">
-          <div class="auth-feat-item">✓ <strong>Instant Activation:</strong> No KYC or documentation required</div>
-          <div class="auth-feat-item">✓ <strong>Isolated Ledger:</strong> Dedicated multi-currency merchant wallet</div>
-          <div class="auth-feat-item">✓ <strong>Instant Live API:</strong> Accept BNB, USDT, and crypto in minutes</div>
-        </div>
+        <!-- Step 2: Login 2FA OTP Verification -->
+        <form id="form-login-otp" style="display: none; flex-direction: column; gap: 16px;">
+          <div style="background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 8px; padding: 12px 14px; font-size: 0.85rem; color: #bae6fd;">
+            🔐 <strong>Two-Factor Authentication:</strong> A 6-digit security code was sent to <strong id="login-sent-email" style="color: #fff;"></strong>.
+          </div>
 
-        <div class="form-group">
-          <label>Business / Brand Name</label>
-          <input type="text" id="reg-name" class="form-input" required placeholder="e.g. Acme Tech, Apex Store">
-        </div>
-        <div class="form-group">
-          <label>Business Email</label>
-          <input type="email" id="reg-email" class="form-input" required placeholder="contact@company.com">
-        </div>
-        <div class="form-group">
-          <label>Password (Min 8 characters)</label>
-          <input type="password" id="reg-password" class="form-input" required minlength="8" placeholder="Create a secure password">
-        </div>
-        <div class="form-group">
-          <label>Webhook URL (Optional)</label>
-          <input type="url" id="reg-webhook" class="form-input" placeholder="https://yoursite.com/webhooks/crypto">
-        </div>
-        <div id="register-status" class="alert-box" style="display: none;"></div>
-        <button type="submit" class="btn btn-primary" id="btn-submit-register" style="padding: 12px; font-weight: 700;">Create Merchant Account (Instant)</button>
-      </form>
+          <div class="form-group" style="text-align: center;">
+            <label style="margin-bottom: 8px; font-size: 0.85rem; letter-spacing: 0.5px; text-transform: uppercase;">Enter 6-Digit Security Code</label>
+            <input type="text" id="login-otp-code" class="form-input" required maxlength="6" pattern="[0-9]{6}" inputmode="numeric" placeholder="••••••" style="font-size: 1.8rem; text-align: center; letter-spacing: 12px; font-family: 'JetBrains Mono', monospace; font-weight: 700; height: 54px;" autofocus>
+            <span style="font-size: 0.75rem; color: var(--text-muted); margin-top: 6px; display: block;">Expires in 10 minutes</span>
+          </div>
+
+          <div id="login-otp-status" class="alert-box" style="display: none;"></div>
+
+          <button type="submit" class="btn btn-primary" id="btn-verify-login-otp" style="padding: 12px; font-weight: 700;">Verify & Enter Dashboard 🚀</button>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">
+            <button type="button" class="btn-text" id="btn-back-to-login" style="color: var(--text-muted);">← Back</button>
+            <div>
+              <span>Didn't receive code? </span>
+              <button type="button" class="btn-text" id="btn-resend-login-otp" style="color: var(--accent-cyan);" disabled>Resend (<span id="login-resend-sec">60</span>s)</button>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <!-- Sign Up Container -->
+      <div id="auth-signup-container" style="display: none;">
+        <!-- Step 1: Sign Up Details -->
+        <form id="form-register" style="display: flex; flex-direction: column; gap: 14px;">
+          <div class="auth-features-list">
+            <div class="auth-feat-item">✓ <strong>Instant Activation:</strong> High-security email OTP verification</div>
+            <div class="auth-feat-item">✓ <strong>Isolated Ledger:</strong> Dedicated multi-currency merchant wallet</div>
+            <div class="auth-feat-item">✓ <strong>Instant Live API:</strong> Accept BNB, USDT, and crypto in minutes</div>
+          </div>
+
+          <div style="display: flex; gap: 10px;">
+            <div class="form-group" style="flex: 1;">
+              <label>First Name</label>
+              <input type="text" id="reg-first-name" class="form-input" required placeholder="Alex">
+            </div>
+            <div class="form-group" style="flex: 1;">
+              <label>Last Name</label>
+              <input type="text" id="reg-last-name" class="form-input" required placeholder="Mercer">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Business / Brand Name</label>
+            <input type="text" id="reg-name" class="form-input" required placeholder="e.g. Acme Tech, Apex Store">
+          </div>
+          <div class="form-group">
+            <label>Business Email</label>
+            <input type="email" id="reg-email" class="form-input" required placeholder="contact@company.com">
+          </div>
+          <div class="form-group">
+            <label>Password (Min 8 characters)</label>
+            <input type="password" id="reg-password" class="form-input" required minlength="8" placeholder="Create a secure password">
+          </div>
+          <div id="register-status" class="alert-box" style="display: none;"></div>
+          <button type="submit" class="btn btn-primary" id="btn-submit-register" style="padding: 12px; font-weight: 700;">Send Verification Code 📩</button>
+        </form>
+
+        <!-- Step 2: Sign Up OTP Verification -->
+        <form id="form-register-otp" style="display: none; flex-direction: column; gap: 16px;">
+          <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 8px; padding: 12px 14px; font-size: 0.85rem; color: #a7f3d0;">
+            📩 <strong>Email Verification:</strong> We sent a 6-digit confirmation code to <strong id="reg-sent-email" style="color: #fff;"></strong>.
+          </div>
+
+          <div class="form-group" style="text-align: center;">
+            <label style="margin-bottom: 8px; font-size: 0.85rem; letter-spacing: 0.5px; text-transform: uppercase;">Enter 6-Digit Verification Code</label>
+            <input type="text" id="reg-otp-code" class="form-input" required maxlength="6" pattern="[0-9]{6}" inputmode="numeric" placeholder="••••••" style="font-size: 1.8rem; text-align: center; letter-spacing: 12px; font-family: 'JetBrains Mono', monospace; font-weight: 700; height: 54px;" autofocus>
+            <span style="font-size: 0.75rem; color: var(--text-muted); margin-top: 6px; display: block;">Valid for 10 minutes</span>
+          </div>
+
+          <div id="reg-otp-status" class="alert-box" style="display: none;"></div>
+
+          <button type="submit" class="btn btn-primary" id="btn-verify-reg-otp" style="padding: 12px; font-weight: 700;">Verify Code & Create Account 🚀</button>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">
+            <button type="button" class="btn-text" id="btn-back-to-reg" style="color: var(--text-muted);">← Edit Details</button>
+            <div>
+              <span>Didn't receive code? </span>
+              <button type="button" class="btn-text" id="btn-resend-reg-otp" style="color: var(--accent-cyan);" disabled>Resend (<span id="reg-resend-sec">60</span>s)</button>
+            </div>
+          </div>
+        </form>
+      </div>
     </div>
   </div>
 

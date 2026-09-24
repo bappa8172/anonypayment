@@ -939,24 +939,35 @@ document.getElementById('form-treasury-settings')?.addEventListener('submit', as
 // Authentication, Multi-Merchant & User Mode Frontend Handlers
 // =========================================================================
 
-window.switchAuthTab = (tab) => {
-  const loginForm = document.getElementById('form-login');
-  const regForm = document.getElementById('form-register');
-  const btnLogin = document.getElementById('auth-tab-btn-login');
-  const btnReg = document.getElementById('auth-tab-btn-register');
+// =========================================================================
+// Authentication, Multi-Merchant & User Mode Frontend Handlers (With OTP)
+// =========================================================================
 
-  if (tab === 'login') {
-    loginForm.style.display = 'flex';
-    regForm.style.display = 'none';
-    btnLogin.classList.add('active');
-    btnReg.classList.remove('active');
-  } else {
-    loginForm.style.display = 'none';
-    regForm.style.display = 'flex';
-    btnLogin.classList.remove('active');
-    btnReg.classList.add('active');
-  }
-};
+let loginPendingEmail = '';
+let loginPendingPassword = '';
+let loginTimerInterval = null;
+
+let regPendingData = null;
+let regTimerInterval = null;
+
+function startCooldownTimer(buttonEl, secEl, cooldownSec) {
+  let remaining = cooldownSec;
+  buttonEl.disabled = true;
+  if (secEl) secEl.textContent = remaining;
+
+  const interval = setInterval(() => {
+    remaining--;
+    if (remaining <= 0) {
+      clearInterval(interval);
+      buttonEl.disabled = false;
+      buttonEl.textContent = 'Resend Code';
+    } else {
+      if (secEl) secEl.textContent = remaining;
+    }
+  }, 1000);
+
+  return interval;
+}
 
 async function checkAuth() {
   try {
@@ -1037,7 +1048,36 @@ function renderUserSession(user) {
   updateCodeSnippets(user.apiKey || 'YOUR_API_KEY');
 }
 
-// Login Form Submit
+window.switchAuthTab = (tab) => {
+  const signinContainer = document.getElementById('auth-signin-container');
+  const signupContainer = document.getElementById('auth-signup-container');
+  const btnLogin = document.getElementById('auth-tab-btn-login');
+  const btnReg = document.getElementById('auth-tab-btn-register');
+
+  // Reset status alerts
+  const lStatus = document.getElementById('login-status');
+  const loStatus = document.getElementById('login-otp-status');
+  const rStatus = document.getElementById('register-status');
+  const roStatus = document.getElementById('reg-otp-status');
+  if (lStatus) lStatus.style.display = 'none';
+  if (loStatus) loStatus.style.display = 'none';
+  if (rStatus) rStatus.style.display = 'none';
+  if (roStatus) roStatus.style.display = 'none';
+
+  if (tab === 'login') {
+    if (signinContainer) signinContainer.style.display = 'block';
+    if (signupContainer) signupContainer.style.display = 'none';
+    btnLogin.classList.add('active');
+    btnReg.classList.remove('active');
+  } else {
+    if (signinContainer) signinContainer.style.display = 'none';
+    if (signupContainer) signupContainer.style.display = 'block';
+    btnLogin.classList.remove('active');
+    btnReg.classList.add('active');
+  }
+};
+
+// Login Step 1: Request 2FA OTP
 document.getElementById('form-login')?.addEventListener('submit', async (e) => {
   e.preventDefault();
   const statusEl = document.getElementById('login-status');
@@ -1049,21 +1089,75 @@ document.getElementById('form-login')?.addEventListener('submit', async (e) => {
     const email = document.getElementById('login-email').value.trim();
     const password = document.getElementById('login-password').value;
 
-    const res = await fetch('/auth/login', {
+    const res = await fetch('/auth/login/request-otp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
     });
 
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Login failed');
+    if (!res.ok) throw new Error(data.error || 'Failed to request login security code');
+
+    loginPendingEmail = email;
+    loginPendingPassword = password;
+
+    // Switch to OTP step
+    document.getElementById('form-login').style.display = 'none';
+    document.getElementById('form-login-otp').style.display = 'flex';
+    document.getElementById('login-sent-email').textContent = email;
+    const otpInput = document.getElementById('login-otp-code');
+    otpInput.value = '';
+    otpInput.focus();
+
+    // Start cooldown timer
+    if (loginTimerInterval) clearInterval(loginTimerInterval);
+    const resendBtn = document.getElementById('btn-resend-login-otp');
+    resendBtn.innerHTML = 'Resend (<span id="login-resend-sec">60</span>s)';
+    loginTimerInterval = startCooldownTimer(resendBtn, document.getElementById('login-resend-sec'), data.cooldownSeconds || 60);
+
+  } catch (err) {
+    statusEl.className = 'alert-box alert-error';
+    statusEl.textContent = err.message;
+    statusEl.style.display = 'block';
+  } finally {
+    submitBtn.disabled = false;
+  }
+});
+
+// Login Step 2: Verify OTP
+document.getElementById('form-login-otp')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const statusEl = document.getElementById('login-otp-status');
+  const submitBtn = document.getElementById('btn-verify-login-otp');
+  statusEl.style.display = 'none';
+  submitBtn.disabled = true;
+
+  try {
+    const otp = document.getElementById('login-otp-code').value.trim();
+    if (!otp || otp.length !== 6) throw new Error('Please enter the 6-digit security code');
+
+    const res = await fetch('/auth/login/verify-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: loginPendingEmail, otp }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Verification failed');
 
     authToken = data.token;
     localStorage.setItem('payrail_token', data.token);
     currentUser = data.user;
     renderUserSession(currentUser);
     closeModal('modal-auth');
+
+    // Reset login forms
     document.getElementById('form-login').reset();
+    document.getElementById('form-login-otp').reset();
+    document.getElementById('form-login').style.display = 'flex';
+    document.getElementById('form-login-otp').style.display = 'none';
+    if (loginTimerInterval) clearInterval(loginTimerInterval);
+
     refreshAll();
   } catch (err) {
     statusEl.className = 'alert-box alert-error';
@@ -1074,7 +1168,42 @@ document.getElementById('form-login')?.addEventListener('submit', async (e) => {
   }
 });
 
-// Instant Registration Form Submit (No Docs)
+// Back button from Login OTP
+document.getElementById('btn-back-to-login')?.addEventListener('click', () => {
+  document.getElementById('form-login-otp').style.display = 'none';
+  document.getElementById('form-login').style.display = 'flex';
+  document.getElementById('login-otp-status').style.display = 'none';
+  if (loginTimerInterval) clearInterval(loginTimerInterval);
+});
+
+// Resend Login OTP
+document.getElementById('btn-resend-login-otp')?.addEventListener('click', async () => {
+  const statusEl = document.getElementById('login-otp-status');
+  try {
+    const res = await fetch('/auth/login/request-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: loginPendingEmail, password: loginPendingPassword }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to resend code');
+
+    statusEl.className = 'alert-box alert-success';
+    statusEl.textContent = 'A new security code has been sent to your email.';
+    statusEl.style.display = 'block';
+
+    const resendBtn = document.getElementById('btn-resend-login-otp');
+    resendBtn.innerHTML = 'Resend (<span id="login-resend-sec">60</span>s)';
+    if (loginTimerInterval) clearInterval(loginTimerInterval);
+    loginTimerInterval = startCooldownTimer(resendBtn, document.getElementById('login-resend-sec'), data.cooldownSeconds || 60);
+  } catch (err) {
+    statusEl.className = 'alert-box alert-error';
+    statusEl.textContent = err.message;
+    statusEl.style.display = 'block';
+  }
+});
+
+// Signup Step 1: Request Registration OTP
 document.getElementById('form-register')?.addEventListener('submit', async (e) => {
   e.preventDefault();
   const statusEl = document.getElementById('register-status');
@@ -1083,27 +1212,83 @@ document.getElementById('form-register')?.addEventListener('submit', async (e) =
   submitBtn.disabled = true;
 
   try {
+    const firstName = document.getElementById('reg-first-name').value.trim();
+    const lastName = document.getElementById('reg-last-name').value.trim();
     const businessName = document.getElementById('reg-name').value.trim();
     const email = document.getElementById('reg-email').value.trim();
     const password = document.getElementById('reg-password').value;
-    const webhookUrl = document.getElementById('reg-webhook').value.trim() || undefined;
 
-    const res = await fetch('/auth/register', {
+    const payload = { firstName, lastName, businessName, email, password };
+
+    const res = await fetch('/auth/signup/request-otp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ businessName, email, password, webhookUrl }),
+      body: JSON.stringify(payload),
     });
 
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Registration failed');
+    if (!res.ok) throw new Error(data.error || 'Failed to request registration code');
+
+    regPendingData = payload;
+
+    // Switch to OTP step
+    document.getElementById('form-register').style.display = 'none';
+    document.getElementById('form-register-otp').style.display = 'flex';
+    document.getElementById('reg-sent-email').textContent = email;
+    const otpInput = document.getElementById('reg-otp-code');
+    otpInput.value = '';
+    otpInput.focus();
+
+    // Start cooldown timer
+    if (regTimerInterval) clearInterval(regTimerInterval);
+    const resendBtn = document.getElementById('btn-resend-reg-otp');
+    resendBtn.innerHTML = 'Resend (<span id="reg-resend-sec">60</span>s)';
+    regTimerInterval = startCooldownTimer(resendBtn, document.getElementById('reg-resend-sec'), data.cooldownSeconds || 60);
+
+  } catch (err) {
+    statusEl.className = 'alert-box alert-error';
+    statusEl.textContent = err.message;
+    statusEl.style.display = 'block';
+  } finally {
+    submitBtn.disabled = false;
+  }
+});
+
+// Signup Step 2: Verify Registration OTP
+document.getElementById('form-register-otp')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const statusEl = document.getElementById('reg-otp-status');
+  const submitBtn = document.getElementById('btn-verify-reg-otp');
+  statusEl.style.display = 'none';
+  submitBtn.disabled = true;
+
+  try {
+    const otp = document.getElementById('reg-otp-code').value.trim();
+    if (!otp || otp.length !== 6) throw new Error('Please enter the 6-digit verification code');
+
+    const res = await fetch('/auth/signup/verify-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: regPendingData.email, otp }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Registration verification failed');
 
     authToken = data.token;
     localStorage.setItem('payrail_token', data.token);
     currentUser = data.user;
     renderUserSession(currentUser);
     closeModal('modal-auth');
+
+    // Reset forms
     document.getElementById('form-register').reset();
-    alert(`🎉 Account Created!\n\nWelcome ${data.user.businessName}!\nYour account is live and active. You can now create payment links, invoices, or integrate via API without any documents.`);
+    document.getElementById('form-register-otp').reset();
+    document.getElementById('form-register').style.display = 'flex';
+    document.getElementById('form-register-otp').style.display = 'none';
+    if (regTimerInterval) clearInterval(regTimerInterval);
+
+    alert(`🎉 Account Created!\n\nWelcome ${data.user.businessName}!\nYour account is live and active. You can now accept BNB, USDT, and crypto payments.`);
     refreshAll();
   } catch (err) {
     statusEl.className = 'alert-box alert-error';
@@ -1111,6 +1296,41 @@ document.getElementById('form-register')?.addEventListener('submit', async (e) =
     statusEl.style.display = 'block';
   } finally {
     submitBtn.disabled = false;
+  }
+});
+
+// Back button from Registration OTP
+document.getElementById('btn-back-to-reg')?.addEventListener('click', () => {
+  document.getElementById('form-register-otp').style.display = 'none';
+  document.getElementById('form-register').style.display = 'flex';
+  document.getElementById('reg-otp-status').style.display = 'none';
+  if (regTimerInterval) clearInterval(regTimerInterval);
+});
+
+// Resend Registration OTP
+document.getElementById('btn-resend-reg-otp')?.addEventListener('click', async () => {
+  const statusEl = document.getElementById('reg-otp-status');
+  try {
+    const res = await fetch('/auth/signup/request-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(regPendingData),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to resend code');
+
+    statusEl.className = 'alert-box alert-success';
+    statusEl.textContent = 'A new verification code has been dispatched to your email.';
+    statusEl.style.display = 'block';
+
+    const resendBtn = document.getElementById('btn-resend-reg-otp');
+    resendBtn.innerHTML = 'Resend (<span id="reg-resend-sec">60</span>s)';
+    if (regTimerInterval) clearInterval(regTimerInterval);
+    regTimerInterval = startCooldownTimer(resendBtn, document.getElementById('reg-resend-sec'), data.cooldownSeconds || 60);
+  } catch (err) {
+    statusEl.className = 'alert-box alert-error';
+    statusEl.textContent = err.message;
+    statusEl.style.display = 'block';
   }
 });
 
