@@ -1,0 +1,698 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Payrail — Merchant Gateway & Crypto Wallet Dashboard</title>
+  <link rel="stylesheet" href="./dashboard.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="logo">
+        <span class="logo-icon">⚡</span>
+        <div>
+          <h2>Payrail</h2>
+          <span class="logo-sub">Gateway & Wallet</span>
+        </div>
+      </div>
+
+      <nav class="nav-menu">
+        <button class="nav-item active" data-tab="overview">
+          <span class="icon">📊</span> Overview
+        </button>
+        <button class="nav-item" data-tab="treasury">
+          <span class="icon">🏦</span> Central Wallet (Treasury)
+        </button>
+        <button class="nav-item" data-tab="invoices">
+          <span class="icon">🧾</span> Invoices
+        </button>
+        <button class="nav-item" data-tab="wallet">
+          <span class="icon">💼</span> Merchant Ledger Wallet
+        </button>
+        <button class="nav-item" data-tab="ledger">
+          <span class="icon">📜</span> Ledger History
+        </button>
+        <button class="nav-item" data-tab="payment-links">
+          <span class="icon">🔗</span> Payment Links
+        </button>
+        <button class="nav-item" data-tab="settings">
+          <span class="icon">⚙️</span> API & Settings
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="network-status">
+          <span class="status-dot"></span>
+          <span id="active-network-name">BSC Testnet (97)</span>
+        </div>
+        <div class="block-height">Block: <span id="current-block-height">Loading…</span></div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <!-- Top Bar -->
+      <header class="topbar">
+        <h1 id="page-title">Overview</h1>
+        <div class="topbar-actions">
+          <button class="btn btn-secondary" id="btn-quick-sweep">⚡ Sweep to Treasury</button>
+          <button class="btn btn-secondary" id="btn-quick-deposit">⬇ Deposit Crypto</button>
+          <button class="btn btn-secondary" id="btn-quick-withdraw">⬆ Withdraw</button>
+          <button class="btn btn-primary" id="btn-create-invoice">+ New Invoice</button>
+        </div>
+      </header>
+
+      <!-- TAB 1: OVERVIEW -->
+      <section class="tab-pane active" id="tab-overview">
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <span class="metric-label">Total Invoices</span>
+            <div class="metric-val" id="metric-total-invoices">0</div>
+            <span class="metric-sub" id="metric-confirmed-invoices">0 Confirmed</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">Pending Payments</span>
+            <div class="metric-val" id="metric-pending-invoices">0</div>
+            <span class="metric-sub">Awaiting on-chain deposits</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">Main Wallet (BNB)</span>
+            <div class="metric-val" id="metric-bnb-balance">0.00 BNB</div>
+            <span class="metric-sub">BSC Network</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">Main Wallet (USDT)</span>
+            <div class="metric-val" id="metric-usdt-balance">0.00 USDT</div>
+            <span class="metric-sub">BEP-20 Stablecoin</span>
+          </div>
+        </div>
+
+        <div class="section-card">
+          <div class="section-header">
+            <h3>Recent Invoices</h3>
+            <button class="btn-text" id="view-all-invoices">View all →</button>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Invoice ID</th>
+                  <th>Amount</th>
+                  <th>Network</th>
+                  <th>Status</th>
+                  <th>Address</th>
+                  <th>Created</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="overview-invoices-body">
+                <tr><td colspan="7" class="loading-td">Loading invoices…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: CENTRAL WALLET (TREASURY) -->
+      <section class="tab-pane" id="tab-treasury">
+        <!-- Master Treasury Header Card -->
+        <div class="treasury-header-card">
+          <div class="treasury-meta-left">
+            <div class="treasury-badge-row">
+              <span class="badge-hot" id="treasury-hot-badge">🟢 Hot Wallet Signing Active</span>
+              <span class="badge-sweep" id="treasury-sweep-badge">⚡ Auto-Sweep ON</span>
+              <span class="badge-network" id="treasury-network-badge">BSC / Sepolia / Polygon</span>
+            </div>
+            <h2 class="treasury-title">Central Master Treasury Wallet</h2>
+            <p class="treasury-desc">The master on-chain vault for your payment gateway. Customer deposits across all derived invoice addresses are swept here into central custody.</p>
+            <div class="treasury-address-box">
+              <span class="address-label">Master Vault:</span>
+              <span class="address-hash" id="treasury-master-address">Loading…</span>
+              <button class="btn btn-sm btn-secondary" id="btn-copy-treasury-address" title="Copy Address">📋 Copy</button>
+              <button class="btn btn-sm btn-secondary" id="btn-show-treasury-qr" title="Show QR Code">📱 QR</button>
+              <a id="treasury-explorer-link" class="btn btn-sm btn-secondary" target="_blank" href="#">Explorer ↗</a>
+            </div>
+          </div>
+          <div class="treasury-meta-right">
+            <div class="treasury-actions-group">
+              <button class="btn btn-sweep-primary" id="btn-treasury-sweep-all">
+                <span class="icon">⚡</span> Sweep All to Central Vault
+              </button>
+              <button class="btn btn-secondary" id="btn-treasury-payout">
+                <span class="icon">⬆</span> Cold Storage / Payout
+              </button>
+              <button class="btn btn-secondary" id="btn-treasury-settings">
+                <span class="icon">⚙️</span> Sweep Settings
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pending Sweeps Alert / Status Card -->
+        <div class="unswept-alert-card" id="unswept-alert-container">
+          <div class="unswept-icon">⚡</div>
+          <div class="unswept-info">
+            <h4 id="unswept-alert-title">Awaiting Sweep to Central Treasury</h4>
+            <p id="unswept-status-text">Scanning derived invoice addresses for confirmed customer payments…</p>
+          </div>
+          <button class="btn btn-warning" id="btn-trigger-batch-sweep">Run Sweep Now</button>
+        </div>
+
+        <!-- Live On-Chain Balances in Central Treasury -->
+        <div class="section-card">
+          <div class="section-header">
+            <div>
+              <h3>Live On-Chain Treasury Balances</h3>
+              <p class="section-desc">Real-time balances fetched directly from blockchain RPC nodes (not simulated)</p>
+            </div>
+            <button class="btn btn-secondary btn-sm" id="btn-refresh-treasury">🔄 Refresh On-Chain</button>
+          </div>
+          <div class="wallet-balances-grid" id="treasury-balances-grid">
+            <div class="balance-card">
+              <div class="bal-header"><span class="bal-sym">Loading…</span></div>
+              <div class="bal-amount">…</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Confirmed Invoices Awaiting Sweep -->
+        <div class="section-card">
+          <div class="section-header">
+            <div>
+              <h3>Confirmed Payments Awaiting Sweep</h3>
+              <p class="section-desc">Customer payments confirmed on derived child addresses ready to be forwarded to Central Treasury</p>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Invoice ID</th>
+                  <th>Amount</th>
+                  <th>Currency</th>
+                  <th>Child Deposit Address</th>
+                  <th>Confirmed At</th>
+                  <th>Sweep Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="unswept-invoices-body">
+                <tr><td colspan="7" class="loading-td">No unswept payments pending. All funds are consolidated!</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Sweeps Audit History -->
+        <div class="section-card">
+          <div class="section-header">
+            <div>
+              <h3>Sweeps Audit Journal</h3>
+              <p class="section-desc">On-chain audit history of all sweep transactions from customer invoice addresses to Central Treasury</p>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Date & Time</th>
+                  <th>Invoice</th>
+                  <th>Amount</th>
+                  <th>Currency</th>
+                  <th>From (Invoice Address)</th>
+                  <th>To (Central Treasury)</th>
+                  <th>Status</th>
+                  <th>Tx Hash</th>
+                </tr>
+              </thead>
+              <tbody id="sweeps-table-body">
+                <tr><td colspan="8" class="loading-td">Loading sweep history…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: INVOICES -->
+      <section class="tab-pane" id="tab-invoices">
+        <div class="section-card">
+          <div class="section-header">
+            <h3>All Payment Invoices</h3>
+            <div class="filters-row">
+              <select id="invoice-filter-status" class="form-input select-mini">
+                <option value="">All Statuses</option>
+                <option value="pending">Pending</option>
+                <option value="paid">Paid (Confirming)</option>
+                <option value="confirmed">Confirmed</option>
+                <option value="expired">Expired</option>
+              </select>
+              <button class="btn btn-primary btn-sm" id="btn-new-invoice-2">+ Create Invoice</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Invoice ID</th>
+                  <th>Amount</th>
+                  <th>Currency</th>
+                  <th>Status</th>
+                  <th>Deposit Address</th>
+                  <th>Tx Hash</th>
+                  <th>Created At</th>
+                  <th>Checkout Page</th>
+                </tr>
+              </thead>
+              <tbody id="invoices-table-body">
+                <tr><td colspan="8" class="loading-td">Loading invoices…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 3: WALLET -->
+      <section class="tab-pane" id="tab-wallet">
+        <div class="section-card">
+          <div class="section-header">
+            <div>
+              <h3>Merchant Treasury Wallet</h3>
+              <p class="section-desc">Multi-currency balances, automated on-chain deposit monitoring & real payout engine</p>
+            </div>
+            <div class="filters-row">
+              <button class="btn btn-secondary" id="btn-wallet-transfer">⇄ Internal Transfer</button>
+              <button class="btn btn-secondary" id="btn-wallet-withdraw">⬆ Withdraw to Address</button>
+              <button class="btn btn-primary" id="btn-wallet-deposit">⬇ Deposit Crypto</button>
+            </div>
+          </div>
+
+          <div class="wallet-balances-grid" id="wallet-cards-grid">
+            <!-- Populated via JS -->
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 4: LEDGER -->
+      <section class="tab-pane" id="tab-ledger">
+        <div class="section-card">
+          <div class="section-header">
+            <div>
+              <h3>Wallet Double-Entry Ledger</h3>
+              <p class="section-desc">Audit journal recording all on-chain deposits, withdrawals, invoice settlements, and transfers</p>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Date & Time</th>
+                  <th>Type</th>
+                  <th>Amount</th>
+                  <th>Currency</th>
+                  <th>Tx Hash / Reference</th>
+                  <th>Note</th>
+                </tr>
+              </thead>
+              <tbody id="ledger-table-body">
+                <tr><td colspan="6" class="loading-td">Loading ledger records…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 5: PAYMENT LINKS -->
+      <section class="tab-pane" id="tab-payment-links">
+        <div class="section-card">
+          <div class="section-header">
+            <div>
+              <h3>Payment Links & Embeds</h3>
+              <p class="section-desc">Shareable payment URLs for e-commerce checkout, donations, or SaaS invoices</p>
+            </div>
+            <button class="btn btn-primary" id="btn-new-payment-link">+ Create Payment Link</button>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Amount</th>
+                  <th>Currency</th>
+                  <th>Code</th>
+                  <th>Link URL</th>
+                  <th>Created</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="payment-links-body">
+                <tr><td colspan="7" class="loading-td">Loading payment links…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 6: SETTINGS & API -->
+      <section class="tab-pane" id="tab-settings">
+        <div class="grid-2col">
+          <div class="section-card">
+            <h3>API Authentication</h3>
+            <p class="section-desc">Use this API Key in your backend headers: <code>X-API-Key: &lt;key&gt;</code></p>
+            <div class="form-group">
+              <label>Admin API Key</label>
+              <div class="input-copy-wrap">
+                <input type="password" id="api-key-input" class="form-input" readonly value="gateway_admin_secret_key_prod_test_32chars">
+                <button class="btn btn-secondary" id="btn-toggle-api-key">Show</button>
+                <button class="btn btn-primary" id="btn-copy-api-key">Copy</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>API Base URL</label>
+              <input type="text" class="form-input" id="api-base-url" readonly value="">
+            </div>
+          </div>
+
+          <div class="section-card">
+            <h3>Active Blockchain RPC</h3>
+            <p class="section-desc">Live blockchain nodes connected to your payment gateway</p>
+            <div class="rpc-info-row">
+              <span>BSC Network:</span>
+              <strong id="rpc-bsc-status">Connected</strong>
+            </div>
+            <div class="rpc-info-row">
+              <span>Chain ID:</span>
+              <strong id="rpc-chain-id">97</strong>
+            </div>
+            <div class="rpc-info-row">
+              <span>Current Block:</span>
+              <strong id="rpc-block-num">Loading…</strong>
+            </div>
+            <div class="rpc-info-row">
+              <span>Gas Price:</span>
+              <strong id="rpc-gas-price">Loading…</strong>
+            </div>
+            <div class="rpc-info-row">
+              <span>Derivation Scheme:</span>
+              <strong>BIP-44 (m/44'/60'/0'/0/x)</strong>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- MODAL: CREATE INVOICE -->
+  <div class="modal-backdrop" id="modal-invoice" style="display: none;">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Create New Invoice</h3>
+        <button class="modal-close" data-close="modal-invoice">&times;</button>
+      </div>
+      <form id="form-create-invoice">
+        <div class="form-group">
+          <label>Cryptocurrency & Network</label>
+          <select class="form-input" id="inv-currency" required>
+            <option value="BNB_BSC">BNB — BNB Smart Chain (Native)</option>
+            <option value="USDT_BSC">USDT — BNB Smart Chain (BEP-20)</option>
+            <option value="ETH_SEPOLIA">ETH — Sepolia Testnet (Native)</option>
+            <option value="USDT_SEPOLIA">USDT — Sepolia Testnet (ERC-20)</option>
+            <option value="MATIC_POLYGON">MATIC/POL — Polygon (Native)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Amount</label>
+          <input type="text" class="form-input" id="inv-amount" placeholder="e.g. 0.05 or 15.00" required>
+        </div>
+        <div class="form-group">
+          <label>Expiry in Minutes</label>
+          <input type="number" class="form-input" id="inv-expiry" value="30" min="5" max="1440">
+        </div>
+        <div class="form-group">
+          <label>Merchant Webhook URL (Optional)</label>
+          <input type="url" class="form-input" id="inv-webhook" placeholder="https://your-store.com/webhook">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close="modal-invoice">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-submit-invoice">Create Invoice</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: DEPOSIT CRYPTO -->
+  <div class="modal-backdrop" id="modal-deposit" style="display: none;">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Deposit Crypto to Wallet</h3>
+        <button class="modal-close" data-close="modal-deposit">&times;</button>
+      </div>
+      <div>
+        <div class="form-group">
+          <label>Select Asset</label>
+          <select class="form-input" id="deposit-currency-select">
+            <option value="BNB_BSC">BNB (BNB Smart Chain)</option>
+            <option value="USDT_BSC">USDT (BEP-20)</option>
+            <option value="ETH_SEPOLIA">ETH (Sepolia)</option>
+            <option value="USDT_SEPOLIA">USDT (Sepolia)</option>
+            <option value="MATIC_POLYGON">MATIC/POL (Polygon)</option>
+          </select>
+        </div>
+        <div class="deposit-qr-wrap">
+          <img id="deposit-qr-img" class="deposit-qr" alt="Deposit QR">
+        </div>
+        <div class="form-group">
+          <label>Deposit Address</label>
+          <div class="input-copy-wrap">
+            <input type="text" id="deposit-address-input" class="form-input" readonly>
+            <button class="btn btn-primary" id="btn-copy-deposit-addr">Copy</button>
+          </div>
+        </div>
+        <p class="modal-hint">Send funds to this address. The monitor automatically verifies incoming transactions and credits your wallet ledger.</p>
+        <div class="modal-footer">
+          <a id="deposit-explorer-link" class="btn btn-secondary" target="_blank" href="#">View on Explorer ↗</a>
+          <button type="button" class="btn btn-primary" data-close="modal-deposit">Done</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: WITHDRAW CRYPTO -->
+  <div class="modal-backdrop" id="modal-withdraw" style="display: none;">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Withdraw Crypto (Real On-Chain Payout)</h3>
+        <button class="modal-close" data-close="modal-withdraw">&times;</button>
+      </div>
+      <form id="form-withdraw">
+        <div class="form-group">
+          <label>Asset to Withdraw</label>
+          <select class="form-input" id="withdraw-currency" required>
+            <option value="BNB_BSC">BNB (BNB Smart Chain)</option>
+            <option value="USDT_BSC">USDT (BEP-20)</option>
+            <option value="ETH_SEPOLIA">ETH (Sepolia)</option>
+            <option value="USDT_SEPOLIA">USDT (Sepolia)</option>
+            <option value="MATIC_POLYGON">MATIC/POL (Polygon)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Available Balance</label>
+          <div id="withdraw-avail-bal" class="avail-badge">Loading…</div>
+        </div>
+        <div class="form-group">
+          <label>Destination Address (0x...)</label>
+          <input type="text" class="form-input" id="withdraw-to-address" placeholder="0x..." required>
+        </div>
+        <div class="form-group">
+          <label>Amount</label>
+          <input type="text" class="form-input" id="withdraw-amount" placeholder="0.00" required>
+        </div>
+        <div class="form-group">
+          <label>Transfer Note</label>
+          <input type="text" class="form-input" id="withdraw-note" value="Merchant payout withdrawal">
+        </div>
+        <div id="withdraw-status" class="alert-box" style="display: none;"></div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close="modal-withdraw">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-submit-withdraw">Broadcast Real Payout 🚀</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: INTERNAL TRANSFER -->
+  <div class="modal-backdrop" id="modal-transfer" style="display: none;">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Instant Internal Transfer (0 Gas)</h3>
+        <button class="modal-close" data-close="modal-transfer">&times;</button>
+      </div>
+      <form id="form-transfer">
+        <div class="form-group">
+          <label>Asset</label>
+          <select class="form-input" id="transfer-currency" required>
+            <option value="BNB_BSC">BNB (BNB Smart Chain)</option>
+            <option value="USDT_BSC">USDT (BEP-20)</option>
+            <option value="ETH_SEPOLIA">ETH (Sepolia)</option>
+            <option value="USDT_SEPOLIA">USDT (Sepolia)</option>
+            <option value="MATIC_POLYGON">MATIC/POL (Polygon)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Recipient Wallet ID</label>
+          <input type="text" class="form-input" id="transfer-to-wallet" placeholder="e.g. user_123 or merchant_partner" required>
+        </div>
+        <div class="form-group">
+          <label>Amount</label>
+          <input type="text" class="form-input" id="transfer-amount" placeholder="0.00" required>
+        </div>
+        <div class="form-group">
+          <label>Note</label>
+          <input type="text" class="form-input" id="transfer-note" value="Internal wallet transfer">
+        </div>
+        <div id="transfer-status" class="alert-box" style="display: none;"></div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close="modal-transfer">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-submit-transfer">Send Instant Transfer</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: CREATE PAYMENT LINK -->
+  <div class="modal-backdrop" id="modal-payment-link" style="display: none;">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Create Reusable Payment Link</h3>
+        <button class="modal-close" data-close="modal-payment-link">&times;</button>
+      </div>
+      <form id="form-payment-link">
+        <div class="form-group">
+          <label>Product / Item Title</label>
+          <input type="text" class="form-input" id="pl-title" placeholder="e.g. Pro Monthly Subscription" required>
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <input type="text" class="form-input" id="pl-desc" placeholder="Brief details about the payment">
+        </div>
+        <div class="form-group">
+          <label>Currency</label>
+          <select class="form-input" id="pl-currency" required>
+            <option value="BNB_BSC">BNB (BNB Smart Chain)</option>
+            <option value="USDT_BSC">USDT (BEP-20)</option>
+            <option value="ETH_SEPOLIA">ETH (Sepolia)</option>
+            <option value="USDT_SEPOLIA">USDT (Sepolia)</option>
+            <option value="MATIC_POLYGON">MATIC/POL (Polygon)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Amount</label>
+          <input type="text" class="form-input" id="pl-amount" placeholder="e.g. 25.00" required>
+        </div>
+        <div class="form-group">
+          <label>Redirect URL after payment (Optional)</label>
+          <input type="url" class="form-input" id="pl-redirect" placeholder="https://yourstore.com/thankyou">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close="modal-payment-link">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create Payment Link</button>
+        </div>
+      </form>
+    </div>
+  <!-- MODAL: TREASURY PAYOUT / COLD STORAGE TRANSFER -->
+  <div class="modal-backdrop" id="modal-treasury-payout" style="display: none;">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Central Treasury On-Chain Payout</h3>
+        <button class="modal-close" data-close="modal-treasury-payout">&times;</button>
+      </div>
+      <form id="form-treasury-payout">
+        <div class="form-group">
+          <label>Asset to Transfer</label>
+          <select class="form-input" id="tp-currency" required>
+            <option value="BNB_BSC">BNB (BNB Smart Chain)</option>
+            <option value="USDT_BSC">USDT (BEP-20)</option>
+            <option value="ETH_SEPOLIA">ETH (Sepolia)</option>
+            <option value="USDT_SEPOLIA">USDT (Sepolia)</option>
+            <option value="MATIC_POLYGON">MATIC/POL (Polygon)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Recipient Address (Cold Storage / Exchange / Wallet)</label>
+          <input type="text" class="form-input" id="tp-to-address" placeholder="0x..." required>
+        </div>
+        <div class="form-group">
+          <label>Amount</label>
+          <input type="text" class="form-input" id="tp-amount" placeholder="0.00" required>
+        </div>
+        <div class="form-group">
+          <label>Transfer Note / Memo</label>
+          <input type="text" class="form-input" id="tp-note" value="Treasury on-chain payout">
+        </div>
+        <div id="tp-status" class="alert-box" style="display: none;"></div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close="modal-treasury-payout">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-submit-treasury-payout">Broadcast On-Chain 🚀</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: TREASURY SETTINGS -->
+  <div class="modal-backdrop" id="modal-treasury-settings" style="display: none;">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Central Treasury & Sweeper Configuration</h3>
+        <button class="modal-close" data-close="modal-treasury-settings">&times;</button>
+      </div>
+      <form id="form-treasury-settings">
+        <div class="form-group">
+          <label>Auto-Sweep Incoming Payments</label>
+          <div class="checkbox-row" style="display: flex; align-items: center; gap: 10px; margin-top: 6px;">
+            <input type="checkbox" id="ts-auto-sweep" style="width: 18px; height: 18px;" checked>
+            <label for="ts-auto-sweep" style="font-weight: 500; cursor: pointer;">Automatically sweep confirmed payments from invoice addresses into Central Treasury</label>
+          </div>
+        </div>
+        <div class="form-group" style="margin-top: 14px;">
+          <label>Cold Storage Address (Optional Auto-Forwarding Destination)</label>
+          <input type="text" class="form-input" id="ts-cold-storage" placeholder="0x... (e.g. Hardware Wallet or Multisig)">
+          <p class="form-hint" style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">Destination address for cold storage sweeps and profits.</p>
+        </div>
+        <div id="ts-status" class="alert-box" style="display: none;"></div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close="modal-treasury-settings">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Settings</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: TREASURY QR CODE -->
+  <div class="modal-backdrop" id="modal-treasury-qr" style="display: none;">
+    <div class="modal modal-center">
+      <div class="modal-header">
+        <h3>Central Master Treasury Address</h3>
+        <button class="modal-close" data-close="modal-treasury-qr">&times;</button>
+      </div>
+      <div class="modal-body text-center" style="display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 20px 0;">
+        <div class="qr-container" style="background: white; padding: 12px; border-radius: 12px; display: inline-block;">
+          <img id="treasury-qr-img" src="" alt="Treasury Address QR" style="width: 240px; height: 240px; display: block;">
+        </div>
+        <div class="address-copy-box" style="width: 100%; max-width: 420px; background: rgba(0,0,0,0.3); padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border); word-break: break-all; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;">
+          <span id="treasury-qr-addr-text">Loading…</span>
+        </div>
+        <button class="btn btn-primary btn-sm" id="btn-copy-treasury-qr-addr">📋 Copy Address</button>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close="modal-treasury-qr">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="./dashboard.js"></script>
+</body>
+</html>

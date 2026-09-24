@@ -1,0 +1,38 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: gateway
+      # Development-only fallback. Set a unique secret via POSTGRES_PASSWORD
+      # before deploying this compose file anywhere shared.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gateway}
+      POSTGRES_DB: gateway
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./sql/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+
+  bsc:
+    image: ghcr.io/bnb-chain/bsc:latest
+    command:
+      - --http
+      - --http.addr=0.0.0.0
+      - --http.port=8545
+      - --http.api=eth,net,web3
+      - --http.vhosts=*
+      - --syncmode=snap
+    volumes:
+      - bscdata:/data
+      - ./bsc/config:/bsc/config:ro
+
+  gateway:
+    build: .
+    env_file: .env
+    depends_on:
+      - postgres
+      - bsc
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata:
+  bscdata:
