@@ -1,12 +1,12 @@
 import express from 'express';
 import { createInvoice, getInvoice, listInvoices } from './invoices.js';
 import { z } from 'zod';
-import { requireAdminApiKey } from './security.js';
+import { authenticate } from './security.js';
 import { getAllAssets } from './assets.js';
 import walletRouter from './walletRouter.js';
 
 const router = express.Router();
-router.use(requireAdminApiKey);
+router.use(authenticate);
 
 const createInvoiceSchema = z.object({
   currency: z.string().default('BNB_BSC'),
@@ -14,36 +14,57 @@ const createInvoiceSchema = z.object({
   expiresInMinutes: z.number().int().min(1).max(24 * 60).optional(),
   webhookUrl: z.string().url().optional().or(z.literal('')),
   metadata: z.record(z.unknown()).optional(),
+  merchantId: z.string().optional(),
+  walletId: z.string().optional(),
 });
 
-// List all invoices
+// List invoices (strictly scoped to merchant unless Super Admin)
 router.get('/invoices', async (req, res) => {
   try {
     const limit = parseInt(req.query.limit || '50', 10);
     const status = req.query.status || null;
-    const invoices = await listInvoices({ limit, status });
+    const merchantId = req.user.role === 'merchant' ? req.user.id : (req.query.merchantId || null);
+
+    const invoices = await listInvoices({ limit, status, merchantId });
     res.json({ invoices });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Create new invoice
+// Create new invoice (automatically bound to merchant identity)
 router.post('/invoices', async (req, res) => {
   try {
     const data = createInvoiceSchema.parse(req.body);
-    const invoice = await createInvoice(data);
+    const merchantId = req.user.role === 'merchant' ? req.user.id : (data.merchantId || null);
+    const walletId = req.user.role === 'merchant' ? req.user.walletId : (data.walletId || 'default');
+
+    const invoice = await createInvoice({
+      ...data,
+      merchantId,
+      walletId,
+    });
     res.json(invoice);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 });
 
-// Get single invoice
+// Get single invoice (with anti-IDOR check)
 router.get('/invoices/:id', async (req, res) => {
-  const invoice = await getInvoice(req.params.id);
-  if (!invoice) return res.status(404).json({ error: 'Not found' });
-  res.json(invoice);
+  try {
+    const invoice = await getInvoice(req.params.id);
+    if (!invoice) return res.status(404).json({ error: 'Invoice not found' });
+
+    // Anti-IDOR check: A merchant can only view their own invoices
+    if (req.user.role === 'merchant' && invoice.merchant_id && invoice.merchant_id !== req.user.id) {
+      return res.status(404).json({ error: 'Invoice not found' });
+    }
+
+    res.json(invoice);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Supported currencies

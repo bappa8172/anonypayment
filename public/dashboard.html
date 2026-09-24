@@ -25,9 +25,6 @@
         <button class="nav-item active" data-tab="overview">
           <span class="icon">📊</span> Overview
         </button>
-        <button class="nav-item" data-tab="treasury">
-          <span class="icon">🏦</span> Central Wallet (Treasury)
-        </button>
         <button class="nav-item" data-tab="invoices">
           <span class="icon">🧾</span> Invoices
         </button>
@@ -39,6 +36,15 @@
         </button>
         <button class="nav-item" data-tab="payment-links">
           <span class="icon">🔗</span> Payment Links
+        </button>
+        <button class="nav-item" data-tab="integration" id="nav-item-integration">
+          <span class="icon">🔌</span> API & Integration
+        </button>
+        <button class="nav-item" data-tab="merchants" id="nav-item-merchants" style="display: none;">
+          <span class="icon">👥</span> Merchants Management
+        </button>
+        <button class="nav-item" data-tab="treasury" id="nav-item-treasury" style="display: none;">
+          <span class="icon">🏦</span> Central Wallet (Treasury)
         </button>
         <button class="nav-item" data-tab="settings">
           <span class="icon">⚙️</span> API & Settings
@@ -60,7 +66,13 @@
       <header class="topbar">
         <h1 id="page-title">Overview</h1>
         <div class="topbar-actions">
-          <button class="btn btn-secondary" id="btn-quick-sweep">⚡ Sweep to Treasury</button>
+          <div class="user-profile-badge" id="user-profile-badge">
+            <span class="user-badge-tag user-badge-merchant" id="user-role-badge">Merchant</span>
+            <span class="user-display-name" id="user-display-name">Loading...</span>
+            <button class="btn btn-secondary btn-sm" id="btn-logout" title="Sign Out">Logout ⎋</button>
+          </div>
+          <button class="btn btn-primary btn-sm" id="btn-open-auth-modal" style="display: none;">Sign In / Register</button>
+          <button class="btn btn-secondary" id="btn-quick-sweep" style="display: none;">⚡ Sweep to Treasury</button>
           <button class="btn btn-secondary" id="btn-quick-deposit">⬇ Deposit Crypto</button>
           <button class="btn btn-secondary" id="btn-quick-withdraw">⬆ Withdraw</button>
           <button class="btn btn-primary" id="btn-create-invoice">+ New Invoice</button>
@@ -357,6 +369,133 @@
         </div>
       </section>
 
+      <!-- TAB: API & DEVELOPER INTEGRATION -->
+      <section class="tab-pane" id="tab-integration">
+        <div class="section-card">
+          <div class="section-header">
+            <div>
+              <h3>Developer API & Instant Integration</h3>
+              <p class="section-desc">Integrate real-time crypto payments into your checkout, SaaS, or app using your API Key</p>
+            </div>
+            <span class="badge" style="background: rgba(16,185,129,0.15); color: #34d399; font-weight: 700; padding: 6px 12px; border-radius: 6px;">Live & Fully Functional</span>
+          </div>
+
+          <div class="credentials-grid">
+            <div class="cred-card">
+              <span class="cred-card-title">Live Merchant API Key</span>
+              <div class="input-copy-wrap">
+                <input type="password" id="mch-api-key-input" class="form-input" readonly value="Loading…">
+                <button class="btn btn-secondary btn-sm" id="btn-toggle-mch-api-key">Show</button>
+                <button class="btn btn-primary btn-sm" id="btn-copy-mch-api-key">Copy</button>
+              </div>
+              <p class="form-hint" style="font-size: 0.78rem; color: var(--text-muted); margin-top: 6px;">Pass as header: <code>X-API-Key: &lt;your_key&gt;</code> or <code>Authorization: Bearer &lt;key&gt;</code></p>
+            </div>
+
+            <div class="cred-card">
+              <span class="cred-card-title">Webhook Signing Secret</span>
+              <div class="input-copy-wrap">
+                <input type="password" id="mch-webhook-secret-input" class="form-input" readonly value="Loading…">
+                <button class="btn btn-secondary btn-sm" id="btn-toggle-mch-wh-sec">Show</button>
+                <button class="btn btn-primary btn-sm" id="btn-copy-mch-wh-sec">Copy</button>
+              </div>
+              <p class="form-hint" style="font-size: 0.78rem; color: var(--text-muted); margin-top: 6px;">Used to verify HMAC-SHA256 signatures on incoming payment webhooks.</p>
+            </div>
+
+            <div class="cred-card">
+              <span class="cred-card-title">Account Identifiers</span>
+              <div style="font-size: 0.85rem; display: flex; flex-direction: column; gap: 8px;">
+                <div>Merchant ID: <code id="mch-id-text" style="color: var(--accent-cyan);">Loading…</code></div>
+                <div>Ledger Wallet: <code id="mch-wallet-text" style="color: #34d399;">Loading…</code></div>
+                <div>Status: <span class="status-active" id="mch-status-badge">Active</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Code Integration Snippets -->
+          <div style="margin-top: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <h4 style="font-size: 1rem;">1. Create an Invoice & Hosted Checkout (API Call)</h4>
+              <div class="snippet-tabs">
+                <button class="snippet-tab-btn active" onclick="switchSnippetLang('curl')">cURL</button>
+                <button class="snippet-tab-btn" onclick="switchSnippetLang('node')">Node.js</button>
+                <button class="snippet-tab-btn" onclick="switchSnippetLang('python')">Python</button>
+              </div>
+            </div>
+
+            <div class="code-snippet-box" id="snippet-create-invoice">
+# Create an on-chain BNB checkout invoice
+curl -X POST http://localhost:3000/v1/merchant/invoices \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: YOUR_MERCHANT_API_KEY" \
+  -d '{
+    "currency": "BNB_BSC",
+    "amount": "0.05",
+    "expiresInMinutes": 30,
+    "webhookUrl": "https://yoursite.com/api/crypto-webhook",
+    "metadata": { "orderId": "ORD-9981", "customer": "alex@mail.com" }
+  }'
+            </div>
+          </div>
+
+          <!-- Webhook verification guide -->
+          <div style="margin-top: 24px;">
+            <h4 style="font-size: 1rem; margin-bottom: 10px;">2. Webhook Verification (HMAC-SHA256)</h4>
+            <div class="code-snippet-box">
+// Node.js Express example to verify and credit order
+import crypto from 'crypto';
+
+app.post('/api/crypto-webhook', express.raw({ type: 'application/json' }), (req, res) => {
+  const signature = req.headers['x-signature'];
+  const expected = crypto.createHmac('sha256', YOUR_WEBHOOK_SECRET)
+    .update(req.body)
+    .digest('hex');
+
+  if (signature !== expected) return res.status(401).send('Invalid signature');
+  const event = JSON.parse(req.body);
+
+  if (event.status === 'confirmed') {
+    // Deliver digital goods, grant access, or mark order fulfilled
+    console.log(`Order ${event.metadata.orderId} paid ${event.amount} ${event.currency}! Tx: ${event.txid}`);
+  }
+  res.status(200).send('OK');
+});
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: MERCHANTS MANAGEMENT (Super Admin Only) -->
+      <section class="tab-pane" id="tab-merchants">
+        <div class="section-card">
+          <div class="section-header">
+            <div>
+              <h3>Merchants & Business Accounts</h3>
+              <p class="section-desc">Manage registered merchant accounts, monitor business volumes, and configure access</p>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="loadMerchantsList()">🔄 Refresh Merchants</button>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Business Name</th>
+                  <th>Email</th>
+                  <th>Merchant ID</th>
+                  <th>Wallet ID</th>
+                  <th>Invoices (Total / Confirmed)</th>
+                  <th>Status</th>
+                  <th>Created</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="merchants-table-body">
+                <tr><td colspan="8" class="loading-td">Loading merchants…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
       <!-- TAB 6: SETTINGS & API -->
       <section class="tab-pane" id="tab-settings">
         <div class="grid-2col">
@@ -364,7 +503,7 @@
             <h3>API Authentication</h3>
             <p class="section-desc">Use this API Key in your backend headers: <code>X-API-Key: &lt;key&gt;</code></p>
             <div class="form-group">
-              <label>Admin API Key</label>
+              <label id="settings-api-key-label">API Key</label>
               <div class="input-copy-wrap">
                 <input type="password" id="api-key-input" class="form-input" readonly value="gateway_admin_secret_key_prod_test_32chars">
                 <button class="btn btn-secondary" id="btn-toggle-api-key">Show</button>
@@ -402,7 +541,7 @@
             </div>
           </div>
 
-          <div class="section-card" style="grid-column: 1 / -1;">
+          <div class="section-card" id="card-backup-keys" style="grid-column: 1 / -1; display: none;">
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
               <div>
                 <h3>Wallet Recovery Phrase & Key Backup</h3>
@@ -697,6 +836,80 @@
         </div>
         <button class="btn btn-primary btn-sm" id="btn-copy-treasury-qr-addr">📋 Copy Address</button>
       </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close="modal-treasury-qr">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: AUTHENTICATION / REGISTRATION -->
+  <div class="modal-backdrop" id="modal-auth" style="display: none;">
+    <div class="modal" style="max-width: 480px;">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 1.4rem;">⚡</span>
+          <div>
+            <h3 style="margin: 0; font-size: 1.15rem;">Payrail Business Portal</h3>
+            <span style="font-size: 0.75rem; color: var(--text-muted);">Self-Custodial Crypto Gateway</span>
+          </div>
+        </div>
+        <button class="modal-close" data-close="modal-auth">&times;</button>
+      </div>
+
+      <div class="auth-toggle-bar">
+        <button type="button" class="auth-toggle-btn active" id="auth-tab-btn-login" onclick="switchAuthTab('login')">Sign In</button>
+        <button type="button" class="auth-toggle-btn" id="auth-tab-btn-register" onclick="switchAuthTab('register')">Register Business (No Docs)</button>
+      </div>
+
+      <!-- Sign In Form -->
+      <form id="form-login" style="display: flex; flex-direction: column; gap: 14px;">
+        <div class="form-group">
+          <label>Email Address</label>
+          <input type="email" id="login-email" class="form-input" required placeholder="merchant@business.com">
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="login-password" class="form-input" required placeholder="••••••••••••">
+        </div>
+        <div id="login-status" class="alert-box" style="display: none;"></div>
+        <button type="submit" class="btn btn-primary" id="btn-submit-login" style="padding: 12px; font-weight: 700;">Sign In to Dashboard</button>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; font-size: 0.8rem; color: var(--text-muted);">
+          <span>Platform Administrator?</span>
+          <button type="button" class="btn-text" id="btn-quick-admin-login" style="color: var(--accent-cyan);">Quick Admin Login →</button>
+        </div>
+      </form>
+
+      <!-- Instant Business Registration Form (No KYC, No Docs) -->
+      <form id="form-register" style="display: none; flex-direction: column; gap: 14px;">
+        <div class="auth-features-list">
+          <div class="auth-feat-item">✓ <strong>Instant Activation:</strong> No KYC or documentation required</div>
+          <div class="auth-feat-item">✓ <strong>Isolated Ledger:</strong> Dedicated multi-currency merchant wallet</div>
+          <div class="auth-feat-item">✓ <strong>Instant Live API:</strong> Accept BNB, USDT, and crypto in minutes</div>
+        </div>
+
+        <div class="form-group">
+          <label>Business / Brand Name</label>
+          <input type="text" id="reg-name" class="form-input" required placeholder="e.g. Acme Tech, Apex Store">
+        </div>
+        <div class="form-group">
+          <label>Business Email</label>
+          <input type="email" id="reg-email" class="form-input" required placeholder="contact@company.com">
+        </div>
+        <div class="form-group">
+          <label>Password (Min 8 characters)</label>
+          <input type="password" id="reg-password" class="form-input" required minlength="8" placeholder="Create a secure password">
+        </div>
+        <div class="form-group">
+          <label>Webhook URL (Optional)</label>
+          <input type="url" id="reg-webhook" class="form-input" placeholder="https://yoursite.com/webhooks/crypto">
+        </div>
+        <div id="register-status" class="alert-box" style="display: none;"></div>
+        <button type="submit" class="btn btn-primary" id="btn-submit-register" style="padding: 12px; font-weight: 700;">Create Merchant Account (Instant)</button>
+      </form>
+    </div>
+  </div>
+
   <!-- MODAL: WALLET SEED PHRASE & KEYS BACKUP -->
   <div class="modal-backdrop" id="modal-backup" style="display: none;">
     <div class="modal">

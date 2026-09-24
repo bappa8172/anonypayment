@@ -1,5 +1,20 @@
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
+CREATE TABLE IF NOT EXISTS merchants (
+  id TEXT PRIMARY KEY,
+  email TEXT UNIQUE NOT NULL,
+  business_name TEXT NOT NULL,
+  password_hash TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'merchant',
+  status TEXT NOT NULL DEFAULT 'active',
+  api_key TEXT UNIQUE NOT NULL,
+  webhook_url TEXT,
+  webhook_secret TEXT NOT NULL,
+  wallet_id TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS invoices (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   currency TEXT NOT NULL,
@@ -17,6 +32,8 @@ CREATE TABLE IF NOT EXISTS invoices (
   metadata JSONB,
   token_contract TEXT,
   derivation_index INT,
+  merchant_id TEXT REFERENCES merchants(id),
+  wallet_id TEXT DEFAULT 'default',
   sweep_status TEXT DEFAULT 'unswept',
   sweep_txid TEXT,
   swept_amount NUMERIC(36,18),
@@ -74,6 +91,8 @@ CREATE TABLE IF NOT EXISTS payment_links (
   currency TEXT NOT NULL,
   amount NUMERIC(36,18) NOT NULL,
   redirect_url TEXT,
+  merchant_id TEXT REFERENCES merchants(id),
+  wallet_id TEXT DEFAULT 'default',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -96,9 +115,13 @@ CREATE TABLE IF NOT EXISTS sweeps (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE INDEX IF NOT EXISTS idx_merchants_email ON merchants(email);
+CREATE INDEX IF NOT EXISTS idx_merchants_api_key ON merchants(api_key);
 CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices(status);
 CREATE INDEX IF NOT EXISTS idx_invoices_address ON invoices(address);
+CREATE INDEX IF NOT EXISTS idx_invoices_merchant ON invoices(merchant_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_invoice_id ON transactions(invoice_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_invoice_txid ON transactions(invoice_id, txid);
 CREATE INDEX IF NOT EXISTS idx_ledger_wallet ON ledger(wallet_id);
+CREATE INDEX IF NOT EXISTS idx_payment_links_merchant ON payment_links(merchant_id);
 CREATE INDEX IF NOT EXISTS idx_sweeps_invoice_id ON sweeps(invoice_id);

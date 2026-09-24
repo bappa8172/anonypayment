@@ -8,6 +8,8 @@ import { logger } from './logger.js';
 import { initDb } from './db.js';
 import adminRouter from './admin.js';
 import publicRouter from './public.js';
+import authRouter from './authRouter.js';
+import merchantApiRouter from './merchantApiRouter.js';
 import { startEVMMonitor } from './monitors/evmMonitor.js';
 import { initEVM } from './evm.js';
 import { basicRateLimit } from './security.js';
@@ -30,6 +32,8 @@ const publicDir = path.join(__dirname, '..', 'public');
 app.use(express.static(publicDir));
 
 // Routes
+app.use('/auth', authRouter);
+app.use('/v1/merchant', merchantApiRouter);
 app.use('/v1', basicRateLimit({ max: 300 }));
 app.use('/admin', adminRouter);
 app.use('/v1', publicRouter);

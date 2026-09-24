@@ -96,6 +96,45 @@ export async function initDb() {
       if (!colNames.has('sweep_error')) {
         await query("ALTER TABLE invoices ADD COLUMN sweep_error TEXT");
       }
+      if (!colNames.has('merchant_id')) {
+        await query("ALTER TABLE invoices ADD COLUMN merchant_id TEXT");
+      }
+      if (!colNames.has('wallet_id')) {
+        await query("ALTER TABLE invoices ADD COLUMN wallet_id TEXT DEFAULT 'default'");
+      }
+
+      // Check payment_links columns
+      const plInfo = await query("PRAGMA table_info(payment_links)");
+      const plCols = new Set(plInfo.rows.map(r => r.name));
+      if (!plCols.has('merchant_id')) {
+        await query("ALTER TABLE payment_links ADD COLUMN merchant_id TEXT");
+      }
+      if (!plCols.has('wallet_id')) {
+        await query("ALTER TABLE payment_links ADD COLUMN wallet_id TEXT DEFAULT 'default'");
+      }
+
+      // Ensure merchants table exists
+      await query(`
+        CREATE TABLE IF NOT EXISTS merchants (
+          id TEXT PRIMARY KEY,
+          email TEXT UNIQUE NOT NULL,
+          business_name TEXT NOT NULL,
+          password_hash TEXT NOT NULL,
+          role TEXT NOT NULL DEFAULT 'merchant',
+          status TEXT NOT NULL DEFAULT 'active',
+          api_key TEXT UNIQUE NOT NULL,
+          webhook_url TEXT,
+          webhook_secret TEXT NOT NULL,
+          wallet_id TEXT NOT NULL REFERENCES wallets(id),
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        )
+      `);
+      await query("CREATE INDEX IF NOT EXISTS idx_merchants_email ON merchants(email)");
+      await query("CREATE INDEX IF NOT EXISTS idx_merchants_api_key ON merchants(api_key)");
+      await query("CREATE INDEX IF NOT EXISTS idx_invoices_merchant ON invoices(merchant_id)");
+      await query("CREATE INDEX IF NOT EXISTS idx_payment_links_merchant ON payment_links(merchant_id)");
+
       await query(`
         CREATE TABLE IF NOT EXISTS sweeps (
           id TEXT PRIMARY KEY,
@@ -118,8 +157,34 @@ export async function initDb() {
       await query("ALTER TABLE invoices ADD COLUMN IF NOT EXISTS swept_amount NUMERIC(36,18)");
       await query("ALTER TABLE invoices ADD COLUMN IF NOT EXISTS swept_at TIMESTAMPTZ");
       await query("ALTER TABLE invoices ADD COLUMN IF NOT EXISTS sweep_error TEXT");
+      await query("ALTER TABLE invoices ADD COLUMN IF NOT EXISTS merchant_id TEXT");
+      await query("ALTER TABLE invoices ADD COLUMN IF NOT EXISTS wallet_id TEXT DEFAULT 'default'");
+      await query("ALTER TABLE payment_links ADD COLUMN IF NOT EXISTS merchant_id TEXT");
+      await query("ALTER TABLE payment_links ADD COLUMN IF NOT EXISTS wallet_id TEXT DEFAULT 'default'");
+      await query(`
+        CREATE TABLE IF NOT EXISTS merchants (
+          id TEXT PRIMARY KEY,
+          email TEXT UNIQUE NOT NULL,
+          business_name TEXT NOT NULL,
+          password_hash TEXT NOT NULL,
+          role TEXT NOT NULL DEFAULT 'merchant',
+          status TEXT NOT NULL DEFAULT 'active',
+          api_key TEXT UNIQUE NOT NULL,
+          webhook_url TEXT,
+          webhook_secret TEXT NOT NULL,
+          wallet_id TEXT NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+      `);
       await query("CREATE INDEX IF NOT EXISTS idx_invoices_sweep_status ON invoices(sweep_status)");
+      await query("CREATE INDEX IF NOT EXISTS idx_invoices_merchant ON invoices(merchant_id)");
+      await query("CREATE INDEX IF NOT EXISTS idx_payment_links_merchant ON payment_links(merchant_id)");
     }
+
+    // Seed master admin account
+    const { ensureAdminAccount } = await import('./auth.js');
+    await ensureAdminAccount();
   } catch (migErr) {
     logger.warn({ err: migErr.message }, 'Migration check in initDb');
   }

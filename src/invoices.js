@@ -15,6 +15,8 @@ export async function createInvoice({
   webhookUrl,
   metadata,
   tokenContract,
+  merchantId = null,
+  walletId = 'default',
 }) {
   const id = uuidv4();
   const expiresAt = new Date(Date.now() + expiresInMinutes * 60000).toISOString();
@@ -35,8 +37,8 @@ export async function createInvoice({
   const confirmationsRequired = asset.isNative ? (asset.chain === 'sepolia' ? 2 : 2) : config.evm.confirmations;
 
   await query(
-    `INSERT INTO invoices (id, currency, address, amount, amount_units, status, confirmations_required, created_at, expires_at, webhook_url, metadata, token_contract, derivation_index)
-     VALUES ($1, $2, $3, $4, $5, 'pending', $6, datetime('now'), $7, $8, $9, $10, $11)`,
+    `INSERT INTO invoices (id, currency, address, amount, amount_units, status, confirmations_required, created_at, expires_at, webhook_url, metadata, token_contract, derivation_index, merchant_id, wallet_id)
+     VALUES ($1, $2, $3, $4, $5, 'pending', $6, datetime('now'), $7, $8, $9, $10, $11, $12, $13)`,
     [
       id,
       asset.currency,
@@ -49,6 +51,8 @@ export async function createInvoice({
       metadata ? JSON.stringify(metadata) : null,
       asset.contract || null,
       derivationIndex,
+      merchantId || null,
+      walletId || 'default',
     ]
   );
 
@@ -63,6 +67,8 @@ export async function createInvoice({
     chainId: asset.chainId,
     isNative: asset.isNative,
     tokenContract: asset.contract,
+    merchantId,
+    walletId,
     expiresAt,
     explorerTx: asset.explorerTx,
     explorerAddress: `${asset.explorerAddress}${address}`,
@@ -74,15 +80,26 @@ export async function getInvoice(id) {
   return res.rows[0];
 }
 
-export async function listInvoices({ limit = 50, status = null } = {}) {
+export async function listInvoices({ limit = 50, status = null, merchantId = null } = {}) {
   let q = 'SELECT * FROM invoices';
   const params = [];
+  const whereClauses = [];
+
   if (status) {
-    q += ' WHERE status = $1';
     params.push(status);
+    whereClauses.push(`status = $${params.length}`);
   }
-  q += ' ORDER BY created_at DESC LIMIT $' + (params.length + 1);
+  if (merchantId) {
+    params.push(merchantId);
+    whereClauses.push(`merchant_id = $${params.length}`);
+  }
+
+  if (whereClauses.length > 0) {
+    q += ' WHERE ' + whereClauses.join(' AND ');
+  }
+
   params.push(limit);
+  q += ` ORDER BY created_at DESC LIMIT $${params.length}`;
 
   const res = await query(q, params);
   return res.rows;
@@ -128,18 +145,19 @@ export async function recordEvmPayment(invoice, { txid, amountUnits, confirmatio
   const previousStatus = invoice.status;
   await updateInvoiceStatus(invoice.id, status, txid, confirmations);
 
-  // If newly confirmed, settle into merchant default wallet
+  // If newly confirmed, settle into merchant's isolated wallet
   if (status === 'confirmed' && previousStatus !== 'confirmed') {
     try {
+      const targetWalletId = invoice.wallet_id || 'default';
       await creditWalletBalance(
-        'default',
+        targetWalletId,
         invoice.currency,
         amountUnits,
         'INVOICE_SETTLEMENT',
         txid,
         `Settlement for invoice #${invoice.id.slice(0, 8)}`
       );
-      logger.info({ invoiceId: invoice.id, amountUnits: amountUnits.toString() }, 'Settled invoice payment into merchant wallet');
+      logger.info({ invoiceId: invoice.id, walletId: targetWalletId, amountUnits: amountUnits.toString() }, 'Settled invoice payment into merchant wallet');
     } catch (settleErr) {
       logger.error({ err: settleErr.message, invoiceId: invoice.id }, 'Failed to settle invoice to wallet');
     }
@@ -185,16 +203,24 @@ export function publicInvoice(invoice) {
   };
 }
 
-export async function createPaymentLink({ title, description = '', currency = 'BNB_BSC', amount, redirectUrl = '' }) {
+export async function createPaymentLink({
+  title,
+  description = '',
+  currency = 'BNB_BSC',
+  amount,
+  redirectUrl = '',
+  merchantId = null,
+  walletId = 'default',
+}) {
   const asset = getAsset(currency);
   const normalizedAmount = normalizeAmount(amount, asset.decimals);
   const id = uuidv4();
   const code = Math.random().toString(36).substring(2, 10).toUpperCase();
 
   await query(
-    `INSERT INTO payment_links (id, code, title, description, currency, amount, redirect_url, created_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, datetime('now'))`,
-    [id, code, title, description, asset.currency, normalizedAmount, redirectUrl]
+    `INSERT INTO payment_links (id, code, title, description, currency, amount, redirect_url, merchant_id, wallet_id, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, datetime('now'))`,
+    [id, code, title, description, asset.currency, normalizedAmount, redirectUrl, merchantId, walletId]
   );
 
   return {
@@ -206,6 +232,8 @@ export async function createPaymentLink({ title, description = '', currency = 'B
     symbol: asset.symbol,
     amount: normalizedAmount,
     redirectUrl,
+    merchantId,
+    walletId,
   };
 }
 
@@ -214,16 +242,37 @@ export async function getPaymentLinkByCode(code) {
   return res.rows[0];
 }
 
-export async function listPaymentLinks(limit = 50) {
-  const res = await query('SELECT * FROM payment_links ORDER BY created_at DESC LIMIT $1', [limit]);
+export async function listPaymentLinks({ limit = 50, merchantId = null } = {}) {
+  let q = 'SELECT * FROM payment_links';
+  const params = [];
+  if (merchantId) {
+    params.push(merchantId);
+    q += ` WHERE merchant_id = $${params.length}`;
+  }
+  params.push(limit);
+  q += ` ORDER BY created_at DESC LIMIT $${params.length}`;
+
+  const res = await query(q, params);
   return res.rows;
 }
 
-export async function getGatewayStats() {
-  const totalInvoicesRes = await query('SELECT COUNT(*) as count FROM invoices');
-  const confirmedInvoicesRes = await query("SELECT COUNT(*) as count FROM invoices WHERE status = 'confirmed'");
-  const pendingInvoicesRes = await query("SELECT COUNT(*) as count FROM invoices WHERE status = 'pending'");
-  const transactionsRes = await query('SELECT COUNT(*) as count FROM transactions');
+export async function getGatewayStats(merchantId = null) {
+  let totalInvoicesRes;
+  let confirmedInvoicesRes;
+  let pendingInvoicesRes;
+  let transactionsRes;
+
+  if (merchantId) {
+    totalInvoicesRes = await query('SELECT COUNT(*) as count FROM invoices WHERE merchant_id = $1', [merchantId]);
+    confirmedInvoicesRes = await query("SELECT COUNT(*) as count FROM invoices WHERE status = 'confirmed' AND merchant_id = $1", [merchantId]);
+    pendingInvoicesRes = await query("SELECT COUNT(*) as count FROM invoices WHERE status = 'pending' AND merchant_id = $1", [merchantId]);
+    transactionsRes = await query('SELECT COUNT(*) as count FROM transactions t JOIN invoices i ON t.invoice_id = i.id WHERE i.merchant_id = $1', [merchantId]);
+  } else {
+    totalInvoicesRes = await query('SELECT COUNT(*) as count FROM invoices');
+    confirmedInvoicesRes = await query("SELECT COUNT(*) as count FROM invoices WHERE status = 'confirmed'");
+    pendingInvoicesRes = await query("SELECT COUNT(*) as count FROM invoices WHERE status = 'pending'");
+    transactionsRes = await query('SELECT COUNT(*) as count FROM transactions');
+  }
 
   return {
     totalInvoices: parseInt(totalInvoicesRes.rows[0]?.count || '0', 10),

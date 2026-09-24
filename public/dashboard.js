@@ -1,8 +1,36 @@
-const API_KEY = 'gateway_admin_secret_key_prod_test_32chars';
-const headers = {
-  'Content-Type': 'application/json',
-  'X-API-Key': API_KEY,
-};
+let authToken = localStorage.getItem('payrail_token') || '';
+let currentUser = null;
+
+function getAuthHeaders() {
+  const h = { 'Content-Type': 'application/json' };
+  if (authToken) {
+    h['Authorization'] = `Bearer ${authToken}`;
+  } else {
+    h['X-API-Key'] = 'gateway_admin_secret_key_prod_test_32chars';
+  }
+  return h;
+}
+
+const headers = new Proxy({}, {
+  get(target, prop) {
+    const authH = getAuthHeaders();
+    return authH[prop];
+  },
+  has(target, prop) {
+    const authH = getAuthHeaders();
+    return prop in authH;
+  },
+  ownKeys(target) {
+    return Object.keys(getAuthHeaders());
+  },
+  getOwnPropertyDescriptor(target, prop) {
+    return {
+      enumerable: true,
+      configurable: true,
+      value: getAuthHeaders()[prop],
+    };
+  },
+});
 
 let currentBalances = [];
 let allInvoices = [];
@@ -574,12 +602,16 @@ document.getElementById('btn-copy-backup-key')?.addEventListener('click', async 
 // Initial Load & Refresh Loop
 function refreshAll() {
   loadOverview();
-  loadTreasuryOverview();
   loadInvoices();
   loadWalletBalances();
   loadLedger();
   loadPaymentLinks();
   loadNetworkStatus();
+
+  if (currentUser && currentUser.role === 'admin') {
+    loadTreasuryOverview();
+    loadMerchantsList();
+  }
 }
 
 // ----------------------------------------------------
@@ -887,5 +919,373 @@ document.getElementById('form-treasury-settings')?.addEventListener('submit', as
   }
 });
 
-refreshAll();
-setInterval(refreshAll, 6000);
+// =========================================================================
+// Authentication, Multi-Merchant & User Mode Frontend Handlers
+// =========================================================================
+
+window.switchAuthTab = (tab) => {
+  const loginForm = document.getElementById('form-login');
+  const regForm = document.getElementById('form-register');
+  const btnLogin = document.getElementById('auth-tab-btn-login');
+  const btnReg = document.getElementById('auth-tab-btn-register');
+
+  if (tab === 'login') {
+    loginForm.style.display = 'flex';
+    regForm.style.display = 'none';
+    btnLogin.classList.add('active');
+    btnReg.classList.remove('active');
+  } else {
+    loginForm.style.display = 'none';
+    regForm.style.display = 'flex';
+    btnLogin.classList.remove('active');
+    btnReg.classList.add('active');
+  }
+};
+
+async function checkAuth() {
+  try {
+    const res = await fetch('/auth/me', { headers });
+    if (res.ok) {
+      const data = await res.json();
+      currentUser = data.user;
+      renderUserSession(currentUser);
+      closeModal('modal-auth');
+      return true;
+    }
+  } catch (err) {
+    console.warn('Auth check error:', err);
+  }
+
+  // Not authenticated
+  currentUser = null;
+  document.getElementById('user-profile-badge').style.display = 'none';
+  document.getElementById('btn-open-auth-modal').style.display = 'inline-block';
+  openModal('modal-auth');
+  return false;
+}
+
+function renderUserSession(user) {
+  const roleBadge = document.getElementById('user-role-badge');
+  const nameEl = document.getElementById('user-display-name');
+  const profileEl = document.getElementById('user-profile-badge');
+  const btnAuth = document.getElementById('btn-open-auth-modal');
+
+  profileEl.style.display = 'flex';
+  btnAuth.style.display = 'none';
+  nameEl.textContent = user.businessName || user.email;
+
+  const navMerchants = document.getElementById('nav-item-merchants');
+  const navTreasury = document.getElementById('nav-item-treasury');
+  const btnSweep = document.getElementById('btn-quick-sweep');
+  const cardBackup = document.getElementById('card-backup-keys');
+
+  if (user.role === 'admin') {
+    roleBadge.textContent = 'Super Admin';
+    roleBadge.className = 'user-badge-tag user-badge-admin';
+    if (navMerchants) navMerchants.style.display = 'flex';
+    if (navTreasury) navTreasury.style.display = 'flex';
+    if (btnSweep) btnSweep.style.display = 'inline-block';
+    if (cardBackup) cardBackup.style.display = 'block';
+  } else {
+    roleBadge.textContent = 'Merchant';
+    roleBadge.className = 'user-badge-tag user-badge-merchant';
+    if (navMerchants) navMerchants.style.display = 'none';
+    if (navTreasury) navTreasury.style.display = 'none';
+    if (btnSweep) btnSweep.style.display = 'none';
+    if (cardBackup) cardBackup.style.display = 'none';
+
+    // If currently on an admin-restricted tab, fallback to overview
+    const activeTab = document.querySelector('.nav-item.active')?.dataset.tab;
+    if (activeTab === 'treasury' || activeTab === 'merchants') {
+      document.querySelector('[data-tab="overview"]').click();
+    }
+  }
+
+  // Populate Developer Integration Tab with Merchant Credentials
+  if (document.getElementById('mch-api-key-input')) {
+    document.getElementById('mch-api-key-input').value = user.apiKey || 'Admin mode - using ADMIN_API_KEY';
+  }
+  if (document.getElementById('mch-webhook-secret-input')) {
+    document.getElementById('mch-webhook-secret-input').value = user.webhookSecret || 'whsec_platform_super_admin';
+  }
+  if (document.getElementById('mch-id-text')) {
+    document.getElementById('mch-id-text').textContent = user.id;
+  }
+  if (document.getElementById('mch-wallet-text')) {
+    document.getElementById('mch-wallet-text').textContent = user.walletId;
+  }
+  if (document.getElementById('mch-status-badge')) {
+    document.getElementById('mch-status-badge').textContent = (user.status || 'active').toUpperCase();
+    document.getElementById('mch-status-badge').className = user.status === 'suspended' ? 'status-suspended' : 'status-active';
+  }
+  updateCodeSnippets(user.apiKey || 'YOUR_API_KEY');
+}
+
+// Login Form Submit
+document.getElementById('form-login')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const statusEl = document.getElementById('login-status');
+  const submitBtn = document.getElementById('btn-submit-login');
+  statusEl.style.display = 'none';
+  submitBtn.disabled = true;
+
+  try {
+    const email = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-password').value;
+
+    const res = await fetch('/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Login failed');
+
+    authToken = data.token;
+    localStorage.setItem('payrail_token', data.token);
+    currentUser = data.user;
+    renderUserSession(currentUser);
+    closeModal('modal-auth');
+    document.getElementById('form-login').reset();
+    refreshAll();
+  } catch (err) {
+    statusEl.className = 'alert-box alert-error';
+    statusEl.textContent = err.message;
+    statusEl.style.display = 'block';
+  } finally {
+    submitBtn.disabled = false;
+  }
+});
+
+// Instant Registration Form Submit (No Docs)
+document.getElementById('form-register')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const statusEl = document.getElementById('register-status');
+  const submitBtn = document.getElementById('btn-submit-register');
+  statusEl.style.display = 'none';
+  submitBtn.disabled = true;
+
+  try {
+    const businessName = document.getElementById('reg-name').value.trim();
+    const email = document.getElementById('reg-email').value.trim();
+    const password = document.getElementById('reg-password').value;
+    const webhookUrl = document.getElementById('reg-webhook').value.trim() || undefined;
+
+    const res = await fetch('/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ businessName, email, password, webhookUrl }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Registration failed');
+
+    authToken = data.token;
+    localStorage.setItem('payrail_token', data.token);
+    currentUser = data.user;
+    renderUserSession(currentUser);
+    closeModal('modal-auth');
+    document.getElementById('form-register').reset();
+    alert(`🎉 Account Created!\n\nWelcome ${data.user.businessName}!\nYour account is live and active. You can now create payment links, invoices, or integrate via API without any documents.`);
+    refreshAll();
+  } catch (err) {
+    statusEl.className = 'alert-box alert-error';
+    statusEl.textContent = err.message;
+    statusEl.style.display = 'block';
+  } finally {
+    submitBtn.disabled = false;
+  }
+});
+
+// Quick Admin Login
+document.getElementById('btn-quick-admin-login')?.addEventListener('click', () => {
+  document.getElementById('login-email').value = 'admin@gateway.local';
+  document.getElementById('login-password').value = 'AdminGateway#2026!SecureKey';
+  document.getElementById('btn-submit-login').click();
+});
+
+// Logout
+document.getElementById('btn-logout')?.addEventListener('click', () => {
+  authToken = '';
+  localStorage.removeItem('payrail_token');
+  currentUser = null;
+  checkAuth();
+});
+
+document.getElementById('btn-open-auth-modal')?.addEventListener('click', () => {
+  openModal('modal-auth');
+});
+
+// Integration Tab Show/Copy Key buttons
+document.getElementById('btn-toggle-mch-api-key')?.addEventListener('click', () => {
+  const input = document.getElementById('mch-api-key-input');
+  const btn = document.getElementById('btn-toggle-mch-api-key');
+  if (input.type === 'password') {
+    input.type = 'text';
+    btn.textContent = 'Hide';
+  } else {
+    input.type = 'password';
+    btn.textContent = 'Show';
+  }
+});
+
+document.getElementById('btn-copy-mch-api-key')?.addEventListener('click', async () => {
+  const input = document.getElementById('mch-api-key-input');
+  await navigator.clipboard.writeText(input.value);
+  const btn = document.getElementById('btn-copy-mch-api-key');
+  btn.textContent = 'Copied!';
+  setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+});
+
+document.getElementById('btn-toggle-mch-wh-sec')?.addEventListener('click', () => {
+  const input = document.getElementById('mch-webhook-secret-input');
+  const btn = document.getElementById('btn-toggle-mch-wh-sec');
+  if (input.type === 'password') {
+    input.type = 'text';
+    btn.textContent = 'Hide';
+  } else {
+    input.type = 'password';
+    btn.textContent = 'Show';
+  }
+});
+
+document.getElementById('btn-copy-mch-wh-sec')?.addEventListener('click', async () => {
+  const input = document.getElementById('mch-webhook-secret-input');
+  await navigator.clipboard.writeText(input.value);
+  const btn = document.getElementById('btn-copy-mch-wh-sec');
+  btn.textContent = 'Copied!';
+  setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+});
+
+// Switch snippet languages
+let currentSnippetLang = 'curl';
+window.switchSnippetLang = (lang) => {
+  currentSnippetLang = lang;
+  document.querySelectorAll('.snippet-tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.textContent.toLowerCase().includes(lang));
+  });
+  updateCodeSnippets(currentUser?.apiKey || 'YOUR_MERCHANT_API_KEY');
+};
+
+function updateCodeSnippets(apiKey) {
+  const origin = window.location.origin;
+  const box = document.getElementById('snippet-create-invoice');
+  if (!box) return;
+
+  if (currentSnippetLang === 'curl') {
+    box.textContent = `# Create an on-chain BNB checkout invoice
+curl -X POST ${origin}/v1/merchant/invoices \\
+  -H "Content-Type: application/json" \\
+  -H "X-API-Key: ${apiKey}" \\
+  -d '{
+    "currency": "BNB_BSC",
+    "amount": "0.05",
+    "expiresInMinutes": 30,
+    "webhookUrl": "https://yoursite.com/api/crypto-webhook",
+    "metadata": { "orderId": "ORD-9981", "customer": "alex@mail.com" }
+  }'`;
+  } else if (currentSnippetLang === 'node') {
+    box.textContent = `// Node.js (Fetch) - Create invoice
+const res = await fetch('${origin}/v1/merchant/invoices', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'X-API-Key': '${apiKey}',
+  },
+  body: JSON.stringify({
+    currency: 'BNB_BSC',
+    amount: '0.05',
+    expiresInMinutes: 30,
+    metadata: { orderId: 'ORD-9981' }
+  }),
+});
+const invoice = await res.json();
+console.log('Customer Payment Address:', invoice.address);
+console.log('Checkout URL: ${origin}/pay?invoice=' + invoice.id);`;
+  } else if (currentSnippetLang === 'python') {
+    box.textContent = `# Python (Requests) - Create invoice
+import requests
+
+url = "${origin}/v1/merchant/invoices"
+headers = {
+    "Content-Type": "application/json",
+    "X-API-Key": "${apiKey}"
+}
+payload = {
+    "currency": "BNB_BSC",
+    "amount": "0.05",
+    "expiresInMinutes": 30,
+    "metadata": {"orderId": "ORD-9981"}
+}
+
+response = requests.post(url, json=payload, headers=headers)
+invoice = response.json()
+print("Payment Address:", invoice["address"])
+print("Checkout URL: ${origin}/pay?invoice=" + invoice["id"])`;
+  }
+}
+
+// Merchants Management Tab (Super Admin Only)
+async function loadMerchantsList() {
+  try {
+    const res = await fetch('/admin/merchants', { headers });
+    if (!res.ok) return;
+    const data = await res.json();
+    const tbody = document.getElementById('merchants-table-body');
+    if (!tbody) return;
+
+    if (!data.merchants || data.merchants.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="8" class="loading-td">No merchant accounts registered yet.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = data.merchants.map(m => {
+      const isSuspended = m.status === 'suspended';
+      const statusBadge = isSuspended
+        ? '<span class="status-suspended">SUSPENDED</span>'
+        : '<span class="status-active">ACTIVE</span>';
+
+      const toggleAction = isSuspended
+        ? `<button class="btn btn-sm btn-primary" onclick="toggleMerchantStatus('${m.id}', 'active')">✓ Activate</button>`
+        : `<button class="btn btn-sm btn-secondary" onclick="toggleMerchantStatus('${m.id}', 'suspended')" style="color: #f87171; border-color: rgba(239,68,68,0.3);">⏸ Suspend</button>`;
+
+      return `
+        <tr>
+          <td><strong>${m.business_name}</strong> ${m.role === 'admin' ? '<span class="badge" style="background:#00f0ff; color:#000; font-size:0.65rem; margin-left:4px;">ADMIN</span>' : ''}</td>
+          <td>${m.email}</td>
+          <td><code>${m.id}</code></td>
+          <td><code>${m.wallet_id}</code></td>
+          <td><strong>${m.total_invoices || 0}</strong> total / <span style="color:#10b981;">${m.confirmed_invoices || 0} confirmed</span></td>
+          <td>${statusBadge}</td>
+          <td>${new Date(m.created_at).toLocaleDateString()}</td>
+          <td>${m.role === 'admin' ? '—' : toggleAction}</td>
+        </tr>
+      `;
+    }).join('');
+  } catch (err) {
+    console.error('Failed to load merchants list:', err);
+  }
+}
+
+window.toggleMerchantStatus = async (merchantId, newStatus) => {
+  if (!confirm(`Are you sure you want to set this merchant to ${newStatus.toUpperCase()}?`)) return;
+  try {
+    const res = await fetch(`/admin/merchants/${merchantId}/status`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ status: newStatus }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to update status');
+    loadMerchantsList();
+  } catch (err) {
+    alert('Error updating merchant status: ' + err.message);
+  }
+};
+
+// Start: Check auth state and initiate refresh loop
+checkAuth().then(() => {
+  refreshAll();
+  setInterval(refreshAll, 6000);
+});

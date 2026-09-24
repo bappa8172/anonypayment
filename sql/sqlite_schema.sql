@@ -1,3 +1,18 @@
+CREATE TABLE IF NOT EXISTS merchants (
+  id TEXT PRIMARY KEY,
+  email TEXT UNIQUE NOT NULL,
+  business_name TEXT NOT NULL,
+  password_hash TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'merchant',
+  status TEXT NOT NULL DEFAULT 'active',
+  api_key TEXT UNIQUE NOT NULL,
+  webhook_url TEXT,
+  webhook_secret TEXT NOT NULL,
+  wallet_id TEXT NOT NULL REFERENCES wallets(id),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS invoices (
   id TEXT PRIMARY KEY,
   currency TEXT NOT NULL,
@@ -15,6 +30,8 @@ CREATE TABLE IF NOT EXISTS invoices (
   metadata TEXT,
   token_contract TEXT,
   derivation_index INTEGER,
+  merchant_id TEXT REFERENCES merchants(id),
+  wallet_id TEXT DEFAULT 'default' REFERENCES wallets(id),
   sweep_status TEXT DEFAULT 'unswept',
   sweep_txid TEXT,
   swept_amount TEXT,
@@ -72,6 +89,8 @@ CREATE TABLE IF NOT EXISTS payment_links (
   currency TEXT NOT NULL,
   amount TEXT NOT NULL,
   redirect_url TEXT,
+  merchant_id TEXT REFERENCES merchants(id),
+  wallet_id TEXT DEFAULT 'default' REFERENCES wallets(id),
   created_at TEXT NOT NULL
 );
 
@@ -94,6 +113,8 @@ CREATE TABLE IF NOT EXISTS sweeps (
   created_at TEXT NOT NULL
 );
 
+CREATE INDEX IF NOT EXISTS idx_merchants_email ON merchants(email);
+CREATE INDEX IF NOT EXISTS idx_merchants_api_key ON merchants(api_key);
 CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices(status);
 CREATE INDEX IF NOT EXISTS idx_invoices_address ON invoices(address);
 CREATE INDEX IF NOT EXISTS idx_transactions_invoice_id ON transactions(invoice_id);
