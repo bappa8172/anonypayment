@@ -10,6 +10,8 @@ import publicRouter from '../src/public.js';
 import { config } from '../src/config.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+process.env.SQLITE_DB_PATH = path.join(__dirname, '..', 'data', 'test_gateway.db');
+
 const TEST_PORT = 3199;
 const BASE = `http://localhost:${TEST_PORT}`;
 const API_KEY = config.adminApiKey || 'gateway_admin_secret_key_prod_test_32chars';

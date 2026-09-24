@@ -1,5 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+process.env.SQLITE_DB_PATH = path.join(__dirname, '..', 'data', 'test_gateway.db');
+
 import { getAsset, getAllAssets } from '../src/assets.js';
 import { initDb, query, getDbType } from '../src/db.js';
 import { initEVM, deriveAddress } from '../src/evm.js';

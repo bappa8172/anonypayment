@@ -46,7 +46,7 @@ export async function initDb() {
     if (!fs.existsSync(dataDir)) {
       fs.mkdirSync(dataDir, { recursive: true });
     }
-    const dbPath = path.join(dataDir, 'gateway.db');
+    const dbPath = process.env.SQLITE_DB_PATH || path.join(dataDir, 'gateway.db');
 
     await new Promise((resolve, reject) => {
       sqliteDb = new sqlite3.Database(dbPath, (err) => {
