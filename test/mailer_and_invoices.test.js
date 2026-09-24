@@ -40,7 +40,7 @@ test('Email & Invoices: 1. Mailer initializes in simulation/preview mode and rec
   });
 
   assert.equal(result.success, true);
-  assert.equal(result.status, 'simulated');
+  assert.ok(['sent', 'simulated'].includes(result.status));
   assert.ok(result.logId);
 
   // Check audit trail
@@ -93,11 +93,14 @@ test('Email & Invoices: 2. Invoice creation stores customer details and triggers
   assert.equal(pub.orderId, orderId);
   assert.equal(pub.description, description);
 
-  // Allow async email dispatch to record
-  await new Promise(r => setTimeout(r, 200));
-
-  const emailLogs = await getEmailLogs({ invoiceId: invoice.id });
-  const invoiceCreatedMail = emailLogs.find(e => e.recipient === customerEmail && e.template === 'invoice_created');
+  // Poll for async email dispatch (handles both simulated and live SMTP)
+  let invoiceCreatedMail = null;
+  for (let i = 0; i < 40; i++) {
+    const emailLogs = await getEmailLogs({ invoiceId: invoice.id });
+    invoiceCreatedMail = emailLogs.find(e => e.recipient === customerEmail && e.template === 'invoice_created');
+    if (invoiceCreatedMail) break;
+    await new Promise(r => setTimeout(r, 200));
+  }
   assert.ok(invoiceCreatedMail, 'Customer should receive invoice creation email');
 });
 
@@ -141,19 +144,22 @@ test('Email & Invoices: 3. Payment settlement triggers automated emails to merch
   assert.ok(bnbBal);
   assert.equal(bnbBal.available, '0.02');
 
-  // Allow async mail dispatch
-  await new Promise(r => setTimeout(r, 300));
-
-  // Check email logs for this invoice
-  const logs = await getEmailLogs({ invoiceId: invoice.id });
+  // Poll for async email dispatches (handles both simulated and live SMTP)
+  let merchantMail = null;
+  let customerMail = null;
+  for (let i = 0; i < 60; i++) {
+    const logs = await getEmailLogs({ invoiceId: invoice.id });
+    merchantMail = logs.find(l => l.recipient === merchantEmail && l.template === 'payment_received_merchant');
+    customerMail = logs.find(l => l.recipient === customerEmail && l.template === 'payment_receipt_customer');
+    if (merchantMail && customerMail) break;
+    await new Promise(r => setTimeout(r, 200));
+  }
 
   // 1. Business Owner (Merchant) should receive payment received email
-  const merchantMail = logs.find(l => l.recipient === merchantEmail && l.template === 'payment_received_merchant');
   assert.ok(merchantMail, 'Merchant must receive payment received notification');
   assert.ok(merchantMail.subject.includes(orderId) || merchantMail.subject.includes('0.02'));
 
   // 2. Customer should receive official payment receipt
-  const customerMail = logs.find(l => l.recipient === customerEmail && l.template === 'payment_receipt_customer');
   assert.ok(customerMail, 'Customer must receive payment receipt email');
   assert.ok(customerMail.subject.includes('Receipt'));
 

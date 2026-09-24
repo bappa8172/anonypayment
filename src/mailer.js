@@ -18,6 +18,9 @@ export function initMailer() {
         user,
         pass,
       },
+      tls: {
+        rejectUnauthorized: false,
+      },
     });
     logger.info({ host, port, user }, 'SMTP email transport initialized for live delivery');
   } else {

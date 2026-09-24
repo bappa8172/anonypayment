@@ -19,12 +19,12 @@ export const config = {
   email: {
     enabled: process.env.SMTP_ENABLED !== 'false',
     host: process.env.SMTP_HOST || '',
-    port: parseInt(process.env.SMTP_PORT || '587', 10),
-    secure: process.env.SMTP_SECURE === 'true',
+    port: parseInt(process.env.SMTP_PORT || '465', 10),
+    secure: process.env.SMTP_SECURE === 'true' || (process.env.SMTP_PORT ? process.env.SMTP_PORT === '465' : true),
     user: process.env.SMTP_USER || '',
     pass: process.env.SMTP_PASS || '',
-    from: process.env.EMAIL_FROM || 'Payrail Payment Gateway <no-reply@payrail.local>',
-    fromName: process.env.EMAIL_FROM_NAME || 'Payrail Payment Gateway',
+    from: process.env.EMAIL_FROM || process.env.SMTP_USER || 'main@grossorymart.com',
+    fromName: process.env.EMAIL_FROM_NAME || 'Grossory Mart Payments',
   },
   evm: {
     mnemonic: process.env.EVM_MNEMONIC,
