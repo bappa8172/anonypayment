@@ -7,6 +7,7 @@ import { getAsset } from '../assets.js';
 import { isAtLeast } from '../money.js';
 import { ethers } from 'ethers';
 import { sweepInvoice, sweepAllUnswept } from '../sweeper.js';
+import { creditWalletBalance } from '../wallet.js';
 
 async function maybeAutoSweep(invoiceId) {
   try {
@@ -156,6 +157,69 @@ export async function verifyTxidForInvoice(invoiceId, txid) {
   return await getInvoice(invoiceId);
 }
 
+/**
+ * Monitor direct on-chain deposits to the Merchant Main Wallet address
+ */
+async function checkDirectWalletDeposits() {
+  try {
+    const settingRes = await query("SELECT value FROM settings WHERE key = 'wallet_address_default'");
+    if (!settingRes.rows.length) return;
+    const address = settingRes.rows[0].value;
+
+    const bnbAsset = getAsset('BNB_BSC');
+    const onChainBal = await getNativeBalance(address, bnbAsset.chain);
+
+    const balRes = await query(
+      "SELECT available_units FROM balances WHERE wallet_id = 'default' AND currency = 'BNB_BSC'"
+    );
+    const recordedUnits = balRes.rows.length ? BigInt(balRes.rows[0].available_units || '0') : 0n;
+
+    if (onChainBal > recordedUnits) {
+      const diffUnits = onChainBal - recordedUnits;
+      logger.info(
+        { address, diffUnits: diffUnits.toString(), onChainBal: onChainBal.toString() },
+        'Detected new on-chain direct deposit to Merchant Wallet'
+      );
+      await creditWalletBalance(
+        'default',
+        'BNB_BSC',
+        diffUnits.toString(),
+        'DEPOSIT',
+        `onchain-${address.slice(0, 8)}-${Date.now()}`,
+        'Direct on-chain deposit from Trust Wallet'
+      );
+    }
+
+    // Check USDT BEP-20
+    const usdtAsset = getAsset('USDT_BSC');
+    if (usdtAsset && usdtAsset.contract) {
+      const onChainUsdt = await getTokenBalance(address, usdtAsset.contract, usdtAsset.chain);
+      const usdtBalRes = await query(
+        "SELECT available_units FROM balances WHERE wallet_id = 'default' AND currency = 'USDT_BSC'"
+      );
+      const recordedUsdtUnits = usdtBalRes.rows.length ? BigInt(usdtBalRes.rows[0].available_units || '0') : 0n;
+
+      if (onChainUsdt > recordedUsdtUnits) {
+        const diffUsdt = onChainUsdt - recordedUsdtUnits;
+        logger.info(
+          { address, diffUsdt: diffUsdt.toString() },
+          'Detected new on-chain USDT deposit to Merchant Wallet'
+        );
+        await creditWalletBalance(
+          'default',
+          'USDT_BSC',
+          diffUsdt.toString(),
+          'DEPOSIT',
+          `onchain-usdt-${address.slice(0, 8)}-${Date.now()}`,
+          'Direct on-chain USDT deposit'
+        );
+      }
+    }
+  } catch (err) {
+    logger.warn({ err: err.message }, 'Error in checkDirectWalletDeposits');
+  }
+}
+
 export async function startEVMMonitor() {
   logger.info('Starting multi-chain EVM Payment Monitor & Treasury Sweeper...');
   let running = false;
@@ -168,6 +232,7 @@ export async function startEVMMonitor() {
       await expireInvoices();
       await checkPendingInvoices();
       await confirmObservedPayments();
+      await checkDirectWalletDeposits();
 
       // Check unswept invoices every 10 cycles (~80s)
       sweepCounter++;

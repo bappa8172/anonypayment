@@ -7,6 +7,44 @@ const headers = {
 let currentBalances = [];
 let allInvoices = [];
 
+// Smart Crypto Amount Formatter - preserves micro amounts like 0.00006365 without rounding to 0
+function formatCrypto(val, maxDecimals = 8) {
+  if (val === null || val === undefined || val === '' || val === '0' || val === '0.0') return '0.00';
+  const num = Number(val);
+  if (isNaN(num) || num === 0) return '0.00';
+  if (num < 0.0001) {
+    // Show exact non-zero precision for micro-amounts (e.g. 0.00006365534)
+    return String(val);
+  }
+  if (num < 1) {
+    return num.toFixed(6).replace(/\.?0+$/, '');
+  }
+  return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+}
+
+// Explorer URL Helpers based on network mode
+function getTxExplorerUrl(txid, currency = 'BNB_BSC') {
+  if (!txid) return '#';
+  if (currency && currency.includes('SEPOLIA')) {
+    return `https://sepolia.etherscan.io/tx/${txid}`;
+  }
+  if (currency && currency.includes('POLYGON')) {
+    return `https://polygonscan.com/tx/${txid}`;
+  }
+  return `https://bscscan.com/tx/${txid}`;
+}
+
+function getAddressExplorerUrl(address, currency = 'BNB_BSC') {
+  if (!address) return '#';
+  if (currency && currency.includes('SEPOLIA')) {
+    return `https://sepolia.etherscan.io/address/${address}`;
+  }
+  if (currency && currency.includes('POLYGON')) {
+    return `https://polygonscan.com/address/${address}`;
+  }
+  return `https://bscscan.com/address/${address}`;
+}
+
 // DOM Elements
 const navItems = document.querySelectorAll('.nav-item');
 const tabPanes = document.querySelectorAll('.tab-pane');
@@ -80,10 +118,10 @@ async function loadOverview() {
 
     currentBalances = data.balances;
     const bnb = data.balances.find(b => b.symbol === 'BNB');
-    if (bnb) document.getElementById('metric-bnb-balance').textContent = `${parseFloat(bnb.available).toFixed(4)} BNB`;
+    if (bnb) document.getElementById('metric-bnb-balance').textContent = `${formatCrypto(bnb.available)} BNB`;
 
     const usdt = data.balances.find(b => b.symbol === 'USDT');
-    if (usdt) document.getElementById('metric-usdt-balance').textContent = `${parseFloat(usdt.available).toFixed(2)} USDT`;
+    if (usdt) document.getElementById('metric-usdt-balance').textContent = `${formatCrypto(usdt.available)} USDT`;
   } catch (err) {
     console.error('Stats error:', err);
   }
@@ -128,7 +166,7 @@ function renderInvoicesTable(tbodyId, invoices, isOverview = false) {
         ${isOverview ? `<td>${inv.currency.split('_')[1] || 'EVM'}</td>` : `<td>${inv.currency}</td>`}
         <td><span class="badge badge-${inv.status}">${inv.status}</span></td>
         <td><code title="${inv.address}">${shortAddr}</code></td>
-        ${!isOverview ? `<td>${inv.txid ? `<a href="${inv.txid.startsWith('0x') ? `https://testnet.bscscan.com/tx/${inv.txid}` : '#'}" target="_blank">${inv.txid.slice(0, 10)}… ↗</a>` : '—'}</td>` : ''}
+        ${!isOverview ? `<td>${inv.txid ? `<a href="${inv.txid.startsWith('0x') ? getTxExplorerUrl(inv.txid, inv.currency) : '#'}" target="_blank">${inv.txid.slice(0, 10)}… ↗</a>` : '—'}</td>` : ''}
         <td>${date}</td>
         <td>
           <a class="btn-text" href="${checkoutUrl}" target="_blank">Checkout ↗</a>
@@ -158,8 +196,8 @@ async function loadWalletBalances() {
             <span class="wallet-asset-title">${bal.name}</span>
             <span class="wallet-chain-tag">${bal.chain.toUpperCase()}</span>
           </div>
-          <div class="wallet-balance-num">${parseFloat(bal.available).toFixed(4)} <span style="font-size: 1.1rem; color: #94a3b8;">${bal.symbol}</span></div>
-          <div class="wallet-balance-sub">Pending confirmations: ${bal.pending} ${bal.symbol}</div>
+          <div class="wallet-balance-num">${formatCrypto(bal.available)} <span style="font-size: 1.1rem; color: #94a3b8;">${bal.symbol}</span></div>
+          <div class="wallet-balance-sub">Pending confirmations: ${formatCrypto(bal.pending)} ${bal.symbol}</div>
         </div>
         <div class="wallet-card-actions">
           <button class="btn btn-secondary btn-sm" onclick="openDepositFor('${bal.currency}')">⬇ Deposit</button>
@@ -315,13 +353,22 @@ async function loadLedger() {
       const isCredit = ['DEPOSIT', 'INVOICE_SETTLEMENT', 'REFUND'].includes(row.type);
       const color = isCredit ? '#10b981' : '#ef4444';
       const sign = isCredit ? '+' : '-';
-      const txidDisplay = row.txid ? `<a href="https://testnet.bscscan.com/tx/${row.txid}" target="_blank">${row.txid.slice(0, 12)}… ↗</a>` : (row.destination_address || '—');
+      let txidDisplay = '—';
+      if (row.txid) {
+        if (row.txid.startsWith('onchain-')) {
+          txidDisplay = `<a href="https://bscscan.com/address/0x7A2BA70d9B9fEFCb53aE08e09D359857Be0fc2c1" target="_blank" style="color: #00f0ff; text-decoration: underline;">On-Chain Deposit (BscScan) ↗</a>`;
+        } else {
+          txidDisplay = `<a href="${getTxExplorerUrl(row.txid, row.currency)}" target="_blank" style="color: #00f0ff;">${row.txid.slice(0, 12)}… ↗</a>`;
+        }
+      } else if (row.destination_address) {
+        txidDisplay = `<a href="${getAddressExplorerUrl(row.destination_address, row.currency)}" target="_blank">${row.destination_address.slice(0, 8)}… ↗</a>`;
+      }
 
       return `
         <tr>
           <td>${date}</td>
           <td><span class="badge" style="background: rgba(255,255,255,0.06);">${row.type}</span></td>
-          <td style="color: ${color}; font-weight: 700;">${sign}${row.amount}</td>
+          <td style="color: ${color}; font-weight: 700;">${sign}${formatCrypto(row.amount)}</td>
           <td>${row.currency}</td>
           <td><code>${txidDisplay}</code></td>
           <td style="color: #94a3b8;">${row.note || '—'}</td>
@@ -457,8 +504,9 @@ async function loadNetworkStatus() {
     const data = await res.json();
 
     document.getElementById('current-block-height').textContent = data.bsc.blockNumber;
-    document.getElementById('rpc-block-num').textContent = data.bsc.blockNumber;
-    document.getElementById('rpc-gas-price').textContent = `${data.bsc.gasPriceGwei} Gwei`;
+    if (document.getElementById('rpc-block-num')) document.getElementById('rpc-block-num').textContent = data.bsc.blockNumber;
+    if (document.getElementById('rpc-chain-id')) document.getElementById('rpc-chain-id').textContent = data.bsc.chainId;
+    if (document.getElementById('rpc-gas-price')) document.getElementById('rpc-gas-price').textContent = `${data.bsc.gasPriceGwei} Gwei`;
     document.getElementById('active-network-name').textContent = `BSC (${data.bsc.chainId}) · ${data.networkMode.toUpperCase()}`;
   } catch (err) {
     console.error('Network status error:', err);
@@ -549,7 +597,7 @@ async function loadTreasuryOverview() {
 
     const explorerLinkEl = document.getElementById('treasury-explorer-link');
     if (explorerLinkEl) {
-      explorerLinkEl.href = `https://testnet.bscscan.com/address/${data.treasuryAddress}`;
+      explorerLinkEl.href = `https://bscscan.com/address/${data.treasuryAddress}`;
     }
 
     const hotBadge = document.getElementById('treasury-hot-badge');
@@ -575,7 +623,7 @@ async function loadTreasuryOverview() {
     const btnBatch = document.getElementById('btn-trigger-batch-sweep');
 
     if (data.unsweptInvoices && data.unsweptInvoices.length > 0) {
-      const summaryText = (data.unsweptSummary || []).map(s => `${parseFloat(s.total_amount).toFixed(4)} ${s.currency}`).join(', ');
+      const summaryText = (data.unsweptSummary || []).map(s => `${formatCrypto(s.total_amount)} ${s.currency}`).join(', ');
       if (alertTitle) alertTitle.textContent = `${data.unsweptInvoices.length} Confirmed Payments Ready to Sweep`;
       if (statusText) statusText.textContent = `Total unswept: ${summaryText || 'Funds awaiting transfer'} stored in child invoice addresses.`;
       if (alertContainer) {
@@ -602,7 +650,7 @@ async function loadTreasuryOverview() {
             <span class="bal-sym">${bal.symbol}</span>
             <span class="bal-chain">${bal.chain.toUpperCase()}</span>
           </div>
-          <div class="bal-amount">${parseFloat(bal.balance).toFixed(bal.isNative ? 4 : 2)} <span class="bal-unit">${bal.symbol}</span></div>
+          <div class="bal-amount">${formatCrypto(bal.balance)} <span class="bal-unit">${bal.symbol}</span></div>
           <div class="bal-footer">
             <span class="bal-sub">${bal.name}</span>
             <a href="${bal.explorerAddress}" target="_blank" class="bal-explorer" title="View on explorer">↗</a>
@@ -620,7 +668,7 @@ async function loadTreasuryOverview() {
         unsweptBody.innerHTML = data.unsweptInvoices.map(inv => `
           <tr>
             <td><code>${inv.id.slice(0, 8)}…</code></td>
-            <td><strong>${inv.amount}</strong></td>
+            <td><strong>${formatCrypto(inv.amount)}</strong></td>
             <td><span class="tag-currency">${inv.currency}</span></td>
             <td><code>${inv.address.slice(0, 8)}…${inv.address.slice(-6)}</code></td>
             <td>${inv.confirmed_at ? new Date(inv.confirmed_at).toLocaleTimeString() : 'Recently'}</td>
@@ -655,12 +703,12 @@ async function loadSweepsHistory() {
       <tr>
         <td>${new Date(sw.created_at).toLocaleString()}</td>
         <td><code>${sw.invoice_id ? sw.invoice_id.slice(0, 8) + '…' : 'Manual'}</code></td>
-        <td><strong>${sw.amount}</strong></td>
+        <td><strong>${formatCrypto(sw.amount)}</strong></td>
         <td><span class="tag-currency">${sw.currency}</span></td>
         <td><code>${sw.from_address.slice(0, 8)}…</code></td>
         <td><code>${sw.to_address.slice(0, 8)}…</code></td>
         <td><span class="status-swept">${sw.status}</span></td>
-        <td>${sw.txid ? `<a href="https://testnet.bscscan.com/tx/${sw.txid}" target="_blank" class="tx-link">${sw.txid.slice(0, 10)}… ↗</a>` : '—'}</td>
+        <td>${sw.txid ? `<a href="${getTxExplorerUrl(sw.txid, sw.currency)}" target="_blank" class="tx-link">${sw.txid.slice(0, 10)}… ↗</a>` : '—'}</td>
       </tr>
     `).join('');
   } catch (err) {
