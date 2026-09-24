@@ -10,7 +10,7 @@ import {
   getOrCreateWallet,
 } from './wallet.js';
 import { createPaymentLink, listPaymentLinks, getGatewayStats } from './invoices.js';
-import { getBlockNumber, getProvider, getCentralTreasuryAddress } from './evm.js';
+import { getBlockNumber, getProvider, getCentralTreasuryAddress, getTreasuryPrivateKey } from './evm.js';
 import { config } from './config.js';
 import { getAllAssets } from './assets.js';
 import QRCode from 'qrcode';
@@ -270,6 +270,26 @@ router.post('/treasury/settings', async (req, res) => {
     res.json({ success: true, message: 'Treasury settings updated' });
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+// 16. Secure Backup (Mnemonic & Central Treasury Key)
+router.get('/wallet/backup', async (req, res) => {
+  try {
+    const settingRes = await query("SELECT value FROM settings WHERE key = 'master_hd_mnemonic'");
+    const mnemonic = settingRes.rows.length ? settingRes.rows[0].value : (config.evm.mnemonic || null);
+    const treasuryAddress = getCentralTreasuryAddress();
+    const treasuryPrivateKey = getTreasuryPrivateKey();
+
+    res.json({
+      treasuryAddress,
+      mnemonic,
+      treasuryPrivateKey,
+      derivationPath: "m/44'/60'/0'/0",
+      warning: "Keep this recovery phrase safe. Importing it into Trust Wallet or MetaMask restores full access to all your funds.",
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

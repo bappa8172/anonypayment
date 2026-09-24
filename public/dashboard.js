@@ -487,6 +487,42 @@ document.getElementById('btn-copy-api-key')?.addEventListener('click', async () 
   setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
 });
 
+// Reveal Recovery Phrase / Backup
+document.getElementById('btn-reveal-backup')?.addEventListener('click', async () => {
+  try {
+    const res = await fetch('/admin/wallet/backup', { headers });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to load backup');
+
+    document.getElementById('backup-mnemonic-text').textContent = data.mnemonic || 'Mnemonic not configured in software. Using external XPUB or private key.';
+    document.getElementById('backup-treasury-address').value = data.treasuryAddress;
+    document.getElementById('backup-treasury-key').value = data.treasuryPrivateKey || 'Private key not available (Watch-only mode)';
+    openModal('modal-backup');
+  } catch (err) {
+    alert('Error loading backup: ' + err.message);
+  }
+});
+
+document.getElementById('btn-toggle-backup-key')?.addEventListener('click', () => {
+  const input = document.getElementById('backup-treasury-key');
+  const btn = document.getElementById('btn-toggle-backup-key');
+  if (input.type === 'password') {
+    input.type = 'text';
+    btn.textContent = 'Hide';
+  } else {
+    input.type = 'password';
+    btn.textContent = 'Show';
+  }
+});
+
+document.getElementById('btn-copy-backup-key')?.addEventListener('click', async () => {
+  const input = document.getElementById('backup-treasury-key');
+  await navigator.clipboard.writeText(input.value);
+  const btn = document.getElementById('btn-copy-backup-key');
+  btn.textContent = 'Copied!';
+  setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+});
+
 // Initial Load & Refresh Loop
 function refreshAll() {
   loadOverview();

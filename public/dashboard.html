@@ -401,6 +401,16 @@
               <strong>BIP-44 (m/44'/60'/0'/0/x)</strong>
             </div>
           </div>
+
+          <div class="section-card" style="grid-column: 1 / -1;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+              <div>
+                <h3>Wallet Recovery Phrase & Key Backup</h3>
+                <p class="section-desc">View your master 12-word seed phrase or export the Central Treasury private key into Trust Wallet / MetaMask so you never lose funds.</p>
+              </div>
+              <button class="btn btn-secondary" id="btn-reveal-backup" style="border-color: var(--accent-cyan); color: var(--accent-cyan);">🔑 Reveal Seed Phrase & Keys</button>
+            </div>
+          </div>
         </div>
       </section>
     </main>
@@ -687,8 +697,42 @@
         </div>
         <button class="btn btn-primary btn-sm" id="btn-copy-treasury-qr-addr">📋 Copy Address</button>
       </div>
+  <!-- MODAL: WALLET SEED PHRASE & KEYS BACKUP -->
+  <div class="modal-backdrop" id="modal-backup" style="display: none;">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Master Seed Phrase & Key Backup</h3>
+        <button class="modal-close" data-close="modal-backup">&times;</button>
+      </div>
+      <div class="modal-body" style="display: flex; flex-direction: column; gap: 16px;">
+        <div style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.35); padding: 12px 16px; border-radius: 10px; font-size: 0.85rem; color: #fbbf24;">
+          ⚠️ <strong>Security Notice:</strong> Anyone with this 12-word seed phrase or private key can access all gateway funds. Write it down and keep it offline!
+        </div>
+
+        <div class="form-group">
+          <label>Master 12-Word Recovery Phrase (BIP-39 Mnemonic)</label>
+          <div style="background: rgba(0,0,0,0.4); border: 1px solid var(--border); padding: 14px; border-radius: 10px; font-family: 'JetBrains Mono', monospace; font-size: 0.95rem; color: #00f0ff; line-height: 1.6;" id="backup-mnemonic-text">
+            Loading…
+          </div>
+          <p class="form-hint" style="font-size: 0.8rem; color: var(--text-muted); margin-top: 6px;">You can import this phrase into Trust Wallet or MetaMask using <em>"Add Wallet" → "I already have a wallet" → "Secret Recovery Phrase"</em>.</p>
+        </div>
+
+        <div class="form-group">
+          <label>Central Treasury Address</label>
+          <input type="text" id="backup-treasury-address" class="form-input" readonly value="Loading…">
+        </div>
+
+        <div class="form-group">
+          <label>Central Treasury Private Key</label>
+          <div class="input-copy-wrap">
+            <input type="password" id="backup-treasury-key" class="form-input" readonly value="Loading…">
+            <button class="btn btn-secondary" id="btn-toggle-backup-key">Show</button>
+            <button class="btn btn-primary" id="btn-copy-backup-key">Copy</button>
+          </div>
+        </div>
+      </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-close="modal-treasury-qr">Close</button>
+        <button type="button" class="btn btn-secondary" data-close="modal-backup">Close</button>
       </div>
     </div>
   </div>
