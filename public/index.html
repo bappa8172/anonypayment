@@ -24,6 +24,11 @@
           <span class="network-badge" id="network-badge">BSC Network</span>
         </div>
 
+        <div id="order-meta-box" style="display: none; margin-bottom: 12px; padding: 10px 14px; background: rgba(255,255,255,0.04); border-radius: 10px; border-left: 3px solid #00f0ff;">
+          <div id="order-ref-badge" style="font-size: 0.78rem; font-weight: 700; color: #38bdf8;"></div>
+          <div id="order-desc" style="font-size: 0.85rem; color: #cbd5e1; margin-top: 2px;"></div>
+        </div>
+
         <div class="amount-wrap">
           <h1 id="amount">Loading…</h1>
           <button class="copy-btn mini" id="copy-amount" title="Copy exact amount">Copy Amount</button>
@@ -50,6 +55,18 @@
             <span class="wallet-icon">🦊</span> Pay with MetaMask / Web3
           </button>
           <div id="web3-status" class="web3-note"></div>
+        </div>
+
+        <!-- Email Receipt Input for Payer -->
+        <div class="receipt-email-section" id="receipt-email-section" style="margin: 18px 0; padding: 14px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 12px;">
+          <div style="font-size: 0.8rem; font-weight: 600; color: #34d399; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+            <span>📧</span> Get Payment Receipt by Email
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <input type="email" id="customer-email-input" placeholder="Enter your email for official receipt" style="flex: 1; padding: 8px 12px; background: #08111e; border: 1px solid #1e293b; border-radius: 8px; color: #f8fafc; font-size: 0.85rem; outline: none;">
+            <button id="btn-save-email" style="padding: 8px 14px; background: #10b981; border: none; border-radius: 8px; color: white; font-weight: 600; font-size: 0.85rem; cursor: pointer;">Save</button>
+          </div>
+          <div id="email-status-msg" style="font-size: 0.75rem; margin-top: 6px; min-height: 16px;"></div>
         </div>
 
         <div class="status-box" id="status-box">

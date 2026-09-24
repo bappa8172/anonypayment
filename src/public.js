@@ -1,6 +1,6 @@
 import express from 'express';
 import QRCode from 'qrcode';
-import { getInvoice, publicInvoice, createInvoice, getPaymentLinkByCode } from './invoices.js';
+import { getInvoice, publicInvoice, createInvoice, getPaymentLinkByCode, updateInvoiceCustomerEmail } from './invoices.js';
 import { verifyTxidForInvoice } from './monitors/evmMonitor.js';
 import { basicRateLimit } from './security.js';
 import { z } from 'zod';
@@ -53,7 +53,23 @@ router.post('/invoices/:id/verify-tx', async (req, res) => {
   }
 });
 
-// 4. Payment Link details
+// 4. Update customer email for invoice receipt
+const customerEmailSchema = z.object({
+  email: z.string().email('Please provide a valid email address'),
+  name: z.string().optional(),
+});
+
+router.post('/invoices/:id/customer-email', async (req, res) => {
+  try {
+    const { email, name } = customerEmailSchema.parse(req.body);
+    const updated = await updateInvoiceCustomerEmail(req.params.id, email, name);
+    return res.json({ success: true, invoice: publicInvoice(updated) });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+// 5. Payment Link details
 router.get('/payment-links/:code', async (req, res, next) => {
   try {
     const link = await getPaymentLinkByCode(req.params.code);

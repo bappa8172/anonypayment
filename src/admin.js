@@ -3,6 +3,7 @@ import { createInvoice, getInvoice, listInvoices } from './invoices.js';
 import { z } from 'zod';
 import { authenticate } from './security.js';
 import { getAllAssets } from './assets.js';
+import { getEmailLogs } from './mailer.js';
 import walletRouter from './walletRouter.js';
 
 const router = express.Router();
@@ -13,6 +14,10 @@ const createInvoiceSchema = z.object({
   amount: z.string().regex(/^\d+(?:\.\d+)?$/),
   expiresInMinutes: z.number().int().min(1).max(24 * 60).optional(),
   webhookUrl: z.string().url().optional().or(z.literal('')),
+  customerEmail: z.string().email().optional().or(z.literal('')),
+  customerName: z.string().optional(),
+  orderId: z.string().optional(),
+  description: z.string().optional(),
   metadata: z.record(z.unknown()).optional(),
   merchantId: z.string().optional(),
   walletId: z.string().optional(),
@@ -70,6 +75,19 @@ router.get('/invoices/:id', async (req, res) => {
 // Supported currencies
 router.get('/assets', (req, res) => {
   res.json({ assets: getAllAssets() });
+});
+
+// Email Audit Logs for Super Admin / Merchant
+router.get('/emails', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit || '50', 10);
+    const merchantId = req.user.role === 'merchant' ? req.user.id : (req.query.merchantId || null);
+    const invoiceId = req.query.invoiceId || null;
+    const emails = await getEmailLogs({ limit, merchantId, invoiceId });
+    res.json({ emails });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Mount wallet router under /admin

@@ -15,6 +15,17 @@ export const config = {
     .map(value => value.trim().toLowerCase())
     .filter(Boolean),
   treasuryPrivateKey: process.env.TREASURY_PRIVATE_KEY,
+  publicUrl: process.env.PUBLIC_URL || `http://localhost:${process.env.PORT || '3000'}`,
+  email: {
+    enabled: process.env.SMTP_ENABLED !== 'false',
+    host: process.env.SMTP_HOST || '',
+    port: parseInt(process.env.SMTP_PORT || '587', 10),
+    secure: process.env.SMTP_SECURE === 'true',
+    user: process.env.SMTP_USER || '',
+    pass: process.env.SMTP_PASS || '',
+    from: process.env.EMAIL_FROM || 'Payrail Payment Gateway <no-reply@payrail.local>',
+    fromName: process.env.EMAIL_FROM_NAME || 'Payrail Payment Gateway',
+  },
   evm: {
     mnemonic: process.env.EVM_MNEMONIC,
     xpub: process.env.EVM_XPUB && process.env.EVM_XPUB !== 'your_evm_xpub_here'

@@ -34,11 +34,30 @@ CREATE TABLE IF NOT EXISTS invoices (
   derivation_index INT,
   merchant_id TEXT REFERENCES merchants(id),
   wallet_id TEXT DEFAULT 'default',
+  customer_email TEXT,
+  customer_name TEXT,
+  order_id TEXT,
+  description TEXT,
+  receipt_email_sent INT DEFAULT 0,
   sweep_status TEXT DEFAULT 'unswept',
   sweep_txid TEXT,
   swept_amount NUMERIC(36,18),
   swept_at TIMESTAMPTZ,
   sweep_error TEXT
+);
+
+CREATE TABLE IF NOT EXISTS email_logs (
+  id TEXT PRIMARY KEY,
+  recipient TEXT NOT NULL,
+  recipient_type TEXT NOT NULL,
+  subject TEXT NOT NULL,
+  template TEXT NOT NULL,
+  invoice_id TEXT REFERENCES invoices(id),
+  merchant_id TEXT REFERENCES merchants(id),
+  status TEXT NOT NULL,
+  error TEXT,
+  preview_text TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE TABLE IF NOT EXISTS transactions (

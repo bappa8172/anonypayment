@@ -103,6 +103,22 @@ export async function initDb() {
         await query("ALTER TABLE invoices ADD COLUMN wallet_id TEXT DEFAULT 'default'");
       }
 
+      if (!colNames.has('customer_email')) {
+        await query("ALTER TABLE invoices ADD COLUMN customer_email TEXT");
+      }
+      if (!colNames.has('customer_name')) {
+        await query("ALTER TABLE invoices ADD COLUMN customer_name TEXT");
+      }
+      if (!colNames.has('order_id')) {
+        await query("ALTER TABLE invoices ADD COLUMN order_id TEXT");
+      }
+      if (!colNames.has('description')) {
+        await query("ALTER TABLE invoices ADD COLUMN description TEXT");
+      }
+      if (!colNames.has('receipt_email_sent')) {
+        await query("ALTER TABLE invoices ADD COLUMN receipt_email_sent INTEGER DEFAULT 0");
+      }
+
       // Check payment_links columns
       const plInfo = await query("PRAGMA table_info(payment_links)");
       const plCols = new Set(plInfo.rows.map(r => r.name));
@@ -134,6 +150,25 @@ export async function initDb() {
       await query("CREATE INDEX IF NOT EXISTS idx_merchants_api_key ON merchants(api_key)");
       await query("CREATE INDEX IF NOT EXISTS idx_invoices_merchant ON invoices(merchant_id)");
       await query("CREATE INDEX IF NOT EXISTS idx_payment_links_merchant ON payment_links(merchant_id)");
+      await query("CREATE INDEX IF NOT EXISTS idx_invoices_customer_email ON invoices(customer_email)");
+
+      await query(`
+        CREATE TABLE IF NOT EXISTS email_logs (
+          id TEXT PRIMARY KEY,
+          recipient TEXT NOT NULL,
+          recipient_type TEXT NOT NULL,
+          subject TEXT NOT NULL,
+          template TEXT NOT NULL,
+          invoice_id TEXT REFERENCES invoices(id),
+          merchant_id TEXT REFERENCES merchants(id),
+          status TEXT NOT NULL,
+          error TEXT,
+          preview_text TEXT,
+          created_at TEXT NOT NULL
+        )
+      `);
+      await query("CREATE INDEX IF NOT EXISTS idx_email_logs_invoice ON email_logs(invoice_id)");
+      await query("CREATE INDEX IF NOT EXISTS idx_email_logs_merchant ON email_logs(merchant_id)");
 
       await query(`
         CREATE TABLE IF NOT EXISTS sweeps (
@@ -159,6 +194,11 @@ export async function initDb() {
       await query("ALTER TABLE invoices ADD COLUMN IF NOT EXISTS sweep_error TEXT");
       await query("ALTER TABLE invoices ADD COLUMN IF NOT EXISTS merchant_id TEXT");
       await query("ALTER TABLE invoices ADD COLUMN IF NOT EXISTS wallet_id TEXT DEFAULT 'default'");
+      await query("ALTER TABLE invoices ADD COLUMN IF NOT EXISTS customer_email TEXT");
+      await query("ALTER TABLE invoices ADD COLUMN IF NOT EXISTS customer_name TEXT");
+      await query("ALTER TABLE invoices ADD COLUMN IF NOT EXISTS order_id TEXT");
+      await query("ALTER TABLE invoices ADD COLUMN IF NOT EXISTS description TEXT");
+      await query("ALTER TABLE invoices ADD COLUMN IF NOT EXISTS receipt_email_sent INT DEFAULT 0");
       await query("ALTER TABLE payment_links ADD COLUMN IF NOT EXISTS merchant_id TEXT");
       await query("ALTER TABLE payment_links ADD COLUMN IF NOT EXISTS wallet_id TEXT DEFAULT 'default'");
       await query(`
@@ -177,9 +217,26 @@ export async function initDb() {
           updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )
       `);
+      await query(`
+        CREATE TABLE IF NOT EXISTS email_logs (
+          id TEXT PRIMARY KEY,
+          recipient TEXT NOT NULL,
+          recipient_type TEXT NOT NULL,
+          subject TEXT NOT NULL,
+          template TEXT NOT NULL,
+          invoice_id TEXT REFERENCES invoices(id),
+          merchant_id TEXT REFERENCES merchants(id),
+          status TEXT NOT NULL,
+          error TEXT,
+          preview_text TEXT,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+      `);
       await query("CREATE INDEX IF NOT EXISTS idx_invoices_sweep_status ON invoices(sweep_status)");
       await query("CREATE INDEX IF NOT EXISTS idx_invoices_merchant ON invoices(merchant_id)");
       await query("CREATE INDEX IF NOT EXISTS idx_payment_links_merchant ON payment_links(merchant_id)");
+      await query("CREATE INDEX IF NOT EXISTS idx_email_logs_invoice ON email_logs(invoice_id)");
+      await query("CREATE INDEX IF NOT EXISTS idx_email_logs_merchant ON email_logs(merchant_id)");
     }
 
     // Seed master admin account
@@ -195,26 +252,32 @@ export async function query(text, params = []) {
     return await pgPool.query(text, params);
   }
 
-  // SQLite execution
-  let sqliteQuery = text.replace(/\$(\d+)/g, '?');
+  // SQLite execution: Map $1, $2, etc. correctly to ordered params array
+  const orderedParams = [];
+  let sqliteQuery = text.replace(/\$(\d+)/g, (match, num) => {
+    const idx = parseInt(num, 10) - 1;
+    orderedParams.push(params[idx]);
+    return '?';
+  });
   sqliteQuery = sqliteQuery.replace(/\bnow\(\)/gi, "datetime('now')");
 
+  const finalParams = orderedParams.length > 0 ? orderedParams : params;
   const trimmed = sqliteQuery.trim();
   const isQueryWithResults = /^(?:SELECT|PRAGMA)\b/i.test(trimmed) || /RETURNING\b/i.test(trimmed);
 
   return new Promise((resolve, reject) => {
     if (isQueryWithResults) {
-      sqliteDb.all(sqliteQuery, params, (err, rows) => {
+      sqliteDb.all(sqliteQuery, finalParams, (err, rows) => {
         if (err) {
-          logger.error({ err: err.message, query: text, params }, 'SQLite query error');
+          logger.error({ err: err.message, query: text, params: finalParams }, 'SQLite query error');
           return reject(err);
         }
         resolve({ rows: rows || [], rowCount: rows ? rows.length : 0 });
       });
     } else {
-      sqliteDb.run(sqliteQuery, params, function (err) {
+      sqliteDb.run(sqliteQuery, finalParams, function (err) {
         if (err) {
-          logger.error({ err: err.message, query: text, params }, 'SQLite run error');
+          logger.error({ err: err.message, query: text, params: finalParams }, 'SQLite run error');
           return reject(err);
         }
         resolve({ rows: [], rowCount: this.changes });

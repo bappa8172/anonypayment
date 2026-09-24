@@ -7,6 +7,7 @@ import { fromBaseUnits, normalizeAmount, toBaseUnits } from './money.js';
 import { assertTrustedWebhookUrl } from './security.js';
 import { creditWalletBalance } from './wallet.js';
 import { logger } from './logger.js';
+import { notifyInvoiceCreated, notifyPaymentReceived } from './mailer.js';
 
 export async function createInvoice({
   currency = 'BNB_BSC',
@@ -17,12 +18,21 @@ export async function createInvoice({
   tokenContract,
   merchantId = null,
   walletId = 'default',
+  customerEmail = null,
+  customerName = null,
+  orderId = null,
+  description = null,
 }) {
   const id = uuidv4();
   const expiresAt = new Date(Date.now() + expiresInMinutes * 60000).toISOString();
   const asset = getAsset(currency);
   if (tokenContract) throw new Error('tokenContract is server-managed and must not be supplied');
   assertTrustedWebhookUrl(webhookUrl);
+
+  const finalCustomerEmail = customerEmail || (metadata && metadata.customerEmail) || null;
+  const finalCustomerName = customerName || (metadata && metadata.customerName) || null;
+  const finalOrderId = orderId || (metadata && metadata.orderId) || null;
+  const finalDescription = description || (metadata && metadata.description) || null;
 
   const evmInitialized = await initEVM();
   if (!evmInitialized) throw new Error('EVM wallet could not be initialized');
@@ -37,8 +47,12 @@ export async function createInvoice({
   const confirmationsRequired = asset.isNative ? (asset.chain === 'sepolia' ? 2 : 2) : config.evm.confirmations;
 
   await query(
-    `INSERT INTO invoices (id, currency, address, amount, amount_units, status, confirmations_required, created_at, expires_at, webhook_url, metadata, token_contract, derivation_index, merchant_id, wallet_id)
-     VALUES ($1, $2, $3, $4, $5, 'pending', $6, datetime('now'), $7, $8, $9, $10, $11, $12, $13)`,
+    `INSERT INTO invoices (
+       id, currency, address, amount, amount_units, status, confirmations_required,
+       created_at, expires_at, webhook_url, metadata, token_contract, derivation_index,
+       merchant_id, wallet_id, customer_email, customer_name, order_id, description
+     )
+     VALUES ($1, $2, $3, $4, $5, 'pending', $6, datetime('now'), $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
     [
       id,
       asset.currency,
@@ -53,10 +67,14 @@ export async function createInvoice({
       derivationIndex,
       merchantId || null,
       walletId || 'default',
+      finalCustomerEmail,
+      finalCustomerName,
+      finalOrderId,
+      finalDescription,
     ]
   );
 
-  return {
+  const invoiceResult = {
     id,
     address,
     amount: normalizedAmount,
@@ -69,10 +87,32 @@ export async function createInvoice({
     tokenContract: asset.contract,
     merchantId,
     walletId,
+    customerEmail: finalCustomerEmail,
+    customerName: finalCustomerName,
+    orderId: finalOrderId,
+    description: finalDescription,
     expiresAt,
     explorerTx: asset.explorerTx,
     explorerAddress: `${asset.explorerAddress}${address}`,
   };
+
+  // If customer email is specified, send the customer their invoice immediately
+  if (finalCustomerEmail) {
+    (async () => {
+      try {
+        let merchant = null;
+        if (merchantId) {
+          const mRes = await query('SELECT * FROM merchants WHERE id = $1', [merchantId]);
+          merchant = mRes.rows[0] || null;
+        }
+        await notifyInvoiceCreated({ invoice: invoiceResult, merchant });
+      } catch (err) {
+        logger.warn({ err: err.message, invoiceId: id }, 'Failed to dispatch invoice creation email');
+      }
+    })();
+  }
+
+  return invoiceResult;
 }
 
 export async function getInvoice(id) {
@@ -145,7 +185,7 @@ export async function recordEvmPayment(invoice, { txid, amountUnits, confirmatio
   const previousStatus = invoice.status;
   await updateInvoiceStatus(invoice.id, status, txid, confirmations);
 
-  // If newly confirmed, settle into merchant's isolated wallet
+      // If newly confirmed, settle into merchant's isolated wallet
   if (status === 'confirmed' && previousStatus !== 'confirmed') {
     try {
       const targetWalletId = invoice.wallet_id || 'default';
@@ -158,6 +198,18 @@ export async function recordEvmPayment(invoice, { txid, amountUnits, confirmatio
         `Settlement for invoice #${invoice.id.slice(0, 8)}`
       );
       logger.info({ invoiceId: invoice.id, walletId: targetWalletId, amountUnits: amountUnits.toString() }, 'Settled invoice payment into merchant wallet');
+
+      // Dispatch automated emails to business owner and customer receipt
+      try {
+        const freshInvoice = await getInvoice(invoice.id);
+        await notifyPaymentReceived({
+          invoice: freshInvoice,
+          txid,
+          confirmations,
+        });
+      } catch (mailErr) {
+        logger.warn({ err: mailErr.message, invoiceId: invoice.id }, 'Failed to dispatch payment notification emails');
+      }
     } catch (settleErr) {
       logger.error({ err: settleErr.message, invoiceId: invoice.id }, 'Failed to settle invoice to wallet');
     }
@@ -168,6 +220,26 @@ export async function recordEvmPayment(invoice, { txid, amountUnits, confirmatio
 
 export async function expireInvoices() {
   await query(`UPDATE invoices SET status = 'expired' WHERE status = 'pending' AND expires_at <= datetime('now')`);
+}
+
+export async function updateInvoiceCustomerEmail(id, customerEmail, customerName = null) {
+  await query(
+    `UPDATE invoices SET customer_email = $2, customer_name = COALESCE($3, customer_name) WHERE id = $1`,
+    [id, customerEmail, customerName]
+  );
+  const updated = await getInvoice(id);
+  if ((updated.status === 'confirmed' || updated.status === 'paid') && !updated.receipt_email_sent) {
+    try {
+      await notifyPaymentReceived({
+        invoice: updated,
+        txid: updated.txid,
+        confirmations: updated.confirmations_required || 1,
+      });
+    } catch (mailErr) {
+      logger.warn({ err: mailErr.message, invoiceId: id }, 'Failed to send receipt after customer email update');
+    }
+  }
+  return updated;
 }
 
 export function publicInvoice(invoice) {
@@ -191,6 +263,10 @@ export function publicInvoice(invoice) {
     address: invoice.address,
     amount: invoice.amount,
     status: invoice.status,
+    customerEmail: invoice.customer_email || null,
+    customerName: invoice.customer_name || null,
+    orderId: invoice.order_id || null,
+    description: invoice.description || null,
     expiresAt: invoice.expires_at,
     paidAt: invoice.paid_at,
     confirmedAt: invoice.confirmed_at,

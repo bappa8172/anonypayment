@@ -86,8 +86,13 @@ navItems.forEach(item => {
     tabPanes.forEach(p => p.classList.remove('active'));
 
     item.classList.add('active');
-    document.getElementById(`tab-${tabName}`).classList.add('active');
+    const targetPane = document.getElementById(`tab-${tabName}`);
+    if (targetPane) targetPane.classList.add('active');
     pageTitle.textContent = item.textContent.trim();
+
+    if (tabName === 'emails') loadEmailLogs();
+    if (tabName === 'merchants') loadMerchantsList();
+    if (tabName === 'invoices') loadInvoices();
   });
 });
 
@@ -189,10 +194,17 @@ function renderInvoicesTable(tbodyId, invoices, isOverview = false) {
 
     return `
       <tr>
-        <td><code title="${inv.id}">${shortId}</code></td>
+        <td>
+          <code title="${inv.id}">${shortId}</code>
+          ${inv.order_id ? `<div style="font-size:0.75rem; color:#38bdf8; font-weight:600;">🏷️ ${inv.order_id}</div>` : ''}
+          ${inv.customer_email ? `<div style="font-size:0.75rem; color:#94a3b8;" title="${inv.customer_email}">📧 ${inv.customer_email.slice(0, 16)}${inv.customer_email.length > 16 ? '…' : ''}</div>` : ''}
+        </td>
         <td><strong>${inv.amount} ${inv.currency.split('_')[0]}</strong></td>
         ${isOverview ? `<td>${inv.currency.split('_')[1] || 'EVM'}</td>` : `<td>${inv.currency}</td>`}
-        <td><span class="badge badge-${inv.status}">${inv.status}</span></td>
+        <td>
+          <span class="badge badge-${inv.status}">${inv.status}</span>
+          ${inv.receipt_email_sent ? '<div style="font-size:0.72rem; color:#34d399; margin-top:2px;">✓ Receipt Emailed</div>' : ''}
+        </td>
         <td><code title="${inv.address}">${shortAddr}</code></td>
         ${!isOverview ? `<td>${inv.txid ? `<a href="${inv.txid.startsWith('0x') ? getTxExplorerUrl(inv.txid, inv.currency) : '#'}" target="_blank">${inv.txid.slice(0, 10)}… ↗</a>` : '—'}</td>` : ''}
         <td>${date}</td>
@@ -495,6 +507,10 @@ document.getElementById('form-create-invoice')?.addEventListener('submit', async
     const body = {
       currency: document.getElementById('inv-currency').value,
       amount: document.getElementById('inv-amount').value.trim(),
+      customerEmail: document.getElementById('inv-customer-email')?.value.trim() || undefined,
+      orderId: document.getElementById('inv-order-id')?.value.trim() || undefined,
+      customerName: document.getElementById('inv-customer-name')?.value.trim() || undefined,
+      description: document.getElementById('inv-description')?.value.trim() || undefined,
       expiresInMinutes: parseInt(document.getElementById('inv-expiry').value, 10),
       webhookUrl: document.getElementById('inv-webhook').value.trim() || undefined,
     };
@@ -1174,19 +1190,22 @@ function updateCodeSnippets(apiKey) {
   if (!box) return;
 
   if (currentSnippetLang === 'curl') {
-    box.textContent = `# Create an on-chain BNB checkout invoice
+    box.textContent = `# Create a crypto invoice with automated email notifications
 curl -X POST ${origin}/v1/merchant/invoices \\
   -H "Content-Type: application/json" \\
   -H "X-API-Key: ${apiKey}" \\
   -d '{
     "currency": "BNB_BSC",
     "amount": "0.05",
+    "customerEmail": "customer@example.com",
+    "customerName": "Alex Rivera",
+    "orderId": "ORD-9981",
+    "description": "Premium E-commerce Order",
     "expiresInMinutes": 30,
-    "webhookUrl": "https://yoursite.com/api/crypto-webhook",
-    "metadata": { "orderId": "ORD-9981", "customer": "alex@mail.com" }
+    "webhookUrl": "https://yoursite.com/api/crypto-webhook"
   }'`;
   } else if (currentSnippetLang === 'node') {
-    box.textContent = `// Node.js (Fetch) - Create invoice
+    box.textContent = `// Node.js (Fetch) - Create invoice with email alerts & receipt
 const res = await fetch('${origin}/v1/merchant/invoices', {
   method: 'POST',
   headers: {
@@ -1196,15 +1215,19 @@ const res = await fetch('${origin}/v1/merchant/invoices', {
   body: JSON.stringify({
     currency: 'BNB_BSC',
     amount: '0.05',
+    customerEmail: 'customer@example.com',
+    customerName: 'Alex Rivera',
+    orderId: 'ORD-9981',
+    description: 'Premium E-commerce Order',
     expiresInMinutes: 30,
-    metadata: { orderId: 'ORD-9981' }
+    webhookUrl: 'https://yoursite.com/api/crypto-webhook'
   }),
 });
 const invoice = await res.json();
 console.log('Customer Payment Address:', invoice.address);
 console.log('Checkout URL: ${origin}/pay?invoice=' + invoice.id);`;
   } else if (currentSnippetLang === 'python') {
-    box.textContent = `# Python (Requests) - Create invoice
+    box.textContent = `# Python (Requests) - Create invoice with email alerts & receipt
 import requests
 
 url = "${origin}/v1/merchant/invoices"
@@ -1215,8 +1238,12 @@ headers = {
 payload = {
     "currency": "BNB_BSC",
     "amount": "0.05",
+    "customerEmail": "customer@example.com",
+    "customerName": "Alex Rivera",
+    "orderId": "ORD-9981",
+    "description": "Premium E-commerce Order",
     "expiresInMinutes": 30,
-    "metadata": {"orderId": "ORD-9981"}
+    "webhookUrl": "https://yoursite.com/api/crypto-webhook"
 }
 
 response = requests.post(url, json=payload, headers=headers)
@@ -1283,6 +1310,54 @@ window.toggleMerchantStatus = async (merchantId, newStatus) => {
     alert('Error updating merchant status: ' + err.message);
   }
 };
+
+// Email Notification Audit Logs
+async function loadEmailLogs() {
+  const tbody = document.getElementById('emails-table-body');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="7" class="loading-td">Loading email delivery logs…</td></tr>';
+
+  try {
+    const res = await fetch('/admin/emails', { headers });
+    if (!res.ok) throw new Error('Failed to load email logs');
+    const data = await res.json();
+    const emails = data.emails || [];
+
+    if (emails.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" class="empty-td" style="text-align:center; padding: 24px; color: #64748b;">No emails dispatched yet. Emails will be logged here automatically when invoices are created or paid.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = emails.map(m => {
+      const date = new Date(m.created_at).toLocaleString();
+      const statusBadge = m.status === 'sent'
+        ? '<span class="status-active" style="font-size:0.75rem;">✓ Delivered (SMTP)</span>'
+        : (m.status === 'simulated'
+            ? '<span class="status-active" style="background:rgba(56,189,248,0.15); color:#38bdf8; font-size:0.75rem;">⚡ Simulated (Dev)</span>'
+            : '<span class="status-suspended" style="font-size:0.75rem;">Failed</span>');
+
+      const roleBadge = m.recipient_type === 'merchant'
+        ? '<span class="badge" style="background:rgba(37,99,235,0.2); color:#60a5fa; font-size:0.72rem;">Merchant (Owner)</span>'
+        : '<span class="badge" style="background:rgba(16,185,129,0.2); color:#34d399; font-size:0.72rem;">Customer (Payer)</span>';
+
+      return `
+        <tr>
+          <td style="font-size:0.8rem; color:#94a3b8;">${date}</td>
+          <td><strong>${m.recipient}</strong></td>
+          <td>${roleBadge}</td>
+          <td><code>${m.template}</code></td>
+          <td>${m.subject}</td>
+          <td>${statusBadge}</td>
+          <td>${m.invoice_id ? `<code title="${m.invoice_id}">${m.invoice_id.slice(0, 8)}…</code>` : '—'}</td>
+        </tr>
+      `;
+    }).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-td" style="color:#f87171; text-align:center;">Failed to fetch email logs: ${err.message}</td></tr>`;
+  }
+}
+window.loadEmailLogs = loadEmailLogs;
+document.getElementById('btn-refresh-emails')?.addEventListener('click', loadEmailLogs);
 
 // Start: Check auth state and initiate refresh loop
 checkAuth().then(() => {

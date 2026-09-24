@@ -4,6 +4,7 @@ import { authenticate } from './security.js';
 import { createInvoice, getInvoice, listInvoices, createPaymentLink, listPaymentLinks } from './invoices.js';
 import { getWalletBalances, getWalletDepositAddress, withdrawCrypto } from './wallet.js';
 import { getAllAssets } from './assets.js';
+import { getEmailLogs } from './mailer.js';
 
 const router = express.Router();
 
@@ -15,6 +16,10 @@ const createInvoiceSchema = z.object({
   amount: z.string().regex(/^\d+(?:\.\d+)?$/, 'Amount must be positive numeric string'),
   expiresInMinutes: z.number().int().min(1).max(24 * 60).optional(),
   webhookUrl: z.string().url().optional().or(z.literal('')),
+  customerEmail: z.string().email().optional().or(z.literal('')),
+  customerName: z.string().optional(),
+  orderId: z.string().optional(),
+  description: z.string().optional(),
   metadata: z.record(z.unknown()).optional(),
 });
 
@@ -153,6 +158,19 @@ router.get('/payment-links', async (req, res) => {
 // 9. Supported Assets
 router.get('/assets', (req, res) => {
   res.json({ assets: getAllAssets() });
+});
+
+// 10. Email Notification Audit Logs
+router.get('/emails', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit || '50', 10);
+    const invoiceId = req.query.invoiceId || null;
+    const merchantId = req.user.role === 'merchant' ? req.user.id : null;
+    const emails = await getEmailLogs({ limit, merchantId, invoiceId });
+    res.json({ emails });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 export default router;

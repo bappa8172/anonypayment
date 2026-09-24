@@ -1,4 +1,4 @@
-const invoiceId = new URLSearchParams(location.search).get('invoice');
+const invoiceId = new URLSearchParams(location.search).get('invoice') || new URLSearchParams(location.search).get('invoiceId');
 
 const amountEl = document.getElementById('amount');
 const copyAmountBtn = document.getElementById('copy-amount');
@@ -16,6 +16,12 @@ const txLink = document.getElementById('tx-link');
 const timerValue = document.getElementById('timer-value');
 const payMetaMaskBtn = document.getElementById('pay-metamask');
 const web3Status = document.getElementById('web3-status');
+const orderMetaBox = document.getElementById('order-meta-box');
+const orderRefBadge = document.getElementById('order-ref-badge');
+const orderDesc = document.getElementById('order-desc');
+const customerEmailInput = document.getElementById('customer-email-input');
+const btnSaveEmail = document.getElementById('btn-save-email');
+const emailStatusMsg = document.getElementById('email-status-msg');
 
 let currentInvoice = null;
 let timerInterval = null;
@@ -86,6 +92,31 @@ function renderInvoice(invoice) {
     statusText.textContent = 'Awaiting payment on blockchain...';
     statusIndicator.className = 'status-indicator amber pulse';
     startCountdown(invoice.expiresAt);
+  }
+
+  // Order metadata rendering
+  if (orderMetaBox) {
+    if (invoice.orderId || invoice.description) {
+      orderMetaBox.style.display = 'block';
+      orderRefBadge.textContent = invoice.orderId ? `Order #${invoice.orderId}` : 'Invoice';
+      orderDesc.textContent = invoice.description || '';
+    } else {
+      orderMetaBox.style.display = 'none';
+    }
+  }
+
+  // Customer email receipt section
+  if (customerEmailInput) {
+    if (invoice.customerEmail) {
+      customerEmailInput.value = invoice.customerEmail;
+      if (invoice.status === 'confirmed') {
+        emailStatusMsg.innerHTML = `<span style="color: #34d399;">✓ Receipt dispatched to <strong>${invoice.customerEmail}</strong></span>`;
+        if (btnSaveEmail) btnSaveEmail.style.display = 'none';
+        customerEmailInput.disabled = true;
+      } else {
+        emailStatusMsg.innerHTML = `<span style="color: #94a3b8;">Receipt will be emailed to <strong>${invoice.customerEmail}</strong> on confirmation.</span>`;
+      }
+    }
   }
 
   // Transaction explorer link
@@ -221,9 +252,39 @@ payMetaMaskBtn.addEventListener('click', async () => {
   }
 });
 
+// Save customer email for payment receipt
+if (btnSaveEmail) {
+  btnSaveEmail.addEventListener('click', async () => {
+    if (!invoiceId) return;
+    const email = customerEmailInput.value.trim();
+    if (!email || !email.includes('@')) {
+      emailStatusMsg.innerHTML = '<span style="color: #f87171;">Please enter a valid email address</span>';
+      return;
+    }
+    btnSaveEmail.disabled = true;
+    btnSaveEmail.textContent = 'Saving…';
+    try {
+      const res = await fetch(`/v1/invoices/${encodeURIComponent(invoiceId)}/customer-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to save email');
+      emailStatusMsg.innerHTML = `<span style="color: #34d399;">✓ Saved! Official receipt will be delivered to <strong>${email}</strong></span>`;
+    } catch (err) {
+      emailStatusMsg.innerHTML = `<span style="color: #f87171;">${err.message}</span>`;
+    } finally {
+      btnSaveEmail.disabled = false;
+      btnSaveEmail.textContent = 'Save';
+    }
+  });
+}
+
 // Initialization
 fetchInvoice();
 if (invoiceId) {
   loadQrCode(invoiceId);
   setInterval(fetchInvoice, 4000);
 }
+

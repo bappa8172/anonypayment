@@ -40,6 +40,9 @@
         <button class="nav-item" data-tab="integration" id="nav-item-integration">
           <span class="icon">🔌</span> API & Integration
         </button>
+        <button class="nav-item" data-tab="emails" id="nav-item-emails">
+          <span class="icon">📧</span> Email Delivery Logs
+        </button>
         <button class="nav-item" data-tab="merchants" id="nav-item-merchants" style="display: none;">
           <span class="icon">👥</span> Merchants Management
         </button>
@@ -494,6 +497,35 @@ app.post('/api/crypto-webhook', express.raw({ type: 'application/json' }), (req,
             </table>
           </div>
         </div>
+      <!-- TAB: EMAIL NOTIFICATIONS & AUDIT LOGS -->
+      <section class="tab-pane" id="tab-emails">
+        <div class="section-card">
+          <div class="section-header">
+            <div>
+              <h3>Automated Email Delivery Logs</h3>
+              <p class="section-desc">Audit trail of all automated payment alerts sent to business owners and official receipts delivered to customers</p>
+            </div>
+            <button class="btn btn-secondary btn-sm" id="btn-refresh-emails">🔄 Refresh Logs</button>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>Recipient</th>
+                  <th>Recipient Role</th>
+                  <th>Template Type</th>
+                  <th>Subject</th>
+                  <th>Delivery Status</th>
+                  <th>Invoice ID</th>
+                </tr>
+              </thead>
+              <tbody id="emails-table-body">
+                <tr><td colspan="7" class="loading-td">Loading email delivery audit logs…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </section>
 
       <!-- TAB 6: SETTINGS & API -->
@@ -576,6 +608,29 @@ app.post('/api/crypto-webhook', express.raw({ type: 'application/json' }), (req,
         <div class="form-group">
           <label>Amount</label>
           <input type="text" class="form-input" id="inv-amount" placeholder="e.g. 0.05 or 15.00" required>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label>Customer Email (for Receipt) 📧</label>
+            <input type="email" class="form-input" id="inv-customer-email" placeholder="customer@example.com">
+          </div>
+          <div class="form-group">
+            <label>Order Reference / ID 🏷️</label>
+            <input type="text" class="form-input" id="inv-order-id" placeholder="e.g. ORD-8812">
+          </div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label>Customer Name (Optional)</label>
+            <input type="text" class="form-input" id="inv-customer-name" placeholder="e.g. Alice Smith">
+          </div>
+          <div class="form-group">
+            <label>Item / Service Description</label>
+            <input type="text" class="form-input" id="inv-description" placeholder="e.g. Digital License">
+          </div>
+        </div>
+        <div style="padding: 10px 14px; background: rgba(16, 185, 129, 0.08); border-left: 3px solid #10b981; border-radius: 6px; font-size: 0.8rem; color: #cbd5e1; margin-bottom: 12px;">
+          ⚡ <strong>Automatic Email Dispatch:</strong> When paid, the business owner receives an immediate payment alert, and the customer receives an official crypto receipt with blockchain transaction verification!
         </div>
         <div class="form-group">
           <label>Expiry in Minutes</label>

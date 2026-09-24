@@ -13,6 +13,7 @@ import merchantApiRouter from './merchantApiRouter.js';
 import { startEVMMonitor } from './monitors/evmMonitor.js';
 import { initEVM } from './evm.js';
 import { basicRateLimit } from './security.js';
+import { initMailer } from './mailer.js';
 
 const app = express();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -68,6 +69,7 @@ app.use((err, req, res, next) => {
 async function main() {
   assertProductionConfiguration();
   await initDb();
+  initMailer();
   await initEVM();
   await startEVMMonitor();
 

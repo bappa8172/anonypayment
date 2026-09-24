@@ -32,11 +32,30 @@ CREATE TABLE IF NOT EXISTS invoices (
   derivation_index INTEGER,
   merchant_id TEXT REFERENCES merchants(id),
   wallet_id TEXT DEFAULT 'default' REFERENCES wallets(id),
+  customer_email TEXT,
+  customer_name TEXT,
+  order_id TEXT,
+  description TEXT,
+  receipt_email_sent INTEGER DEFAULT 0,
   sweep_status TEXT DEFAULT 'unswept',
   sweep_txid TEXT,
   swept_amount TEXT,
   swept_at TEXT,
   sweep_error TEXT
+);
+
+CREATE TABLE IF NOT EXISTS email_logs (
+  id TEXT PRIMARY KEY,
+  recipient TEXT NOT NULL,
+  recipient_type TEXT NOT NULL,
+  subject TEXT NOT NULL,
+  template TEXT NOT NULL,
+  invoice_id TEXT REFERENCES invoices(id),
+  merchant_id TEXT REFERENCES merchants(id),
+  status TEXT NOT NULL,
+  error TEXT,
+  preview_text TEXT,
+  created_at TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS transactions (
@@ -121,3 +140,6 @@ CREATE INDEX IF NOT EXISTS idx_transactions_invoice_id ON transactions(invoice_i
 CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_invoice_txid ON transactions(invoice_id, txid);
 CREATE INDEX IF NOT EXISTS idx_ledger_wallet ON ledger(wallet_id);
 CREATE INDEX IF NOT EXISTS idx_sweeps_invoice_id ON sweeps(invoice_id);
+CREATE INDEX IF NOT EXISTS idx_email_logs_invoice ON email_logs(invoice_id);
+CREATE INDEX IF NOT EXISTS idx_email_logs_merchant ON email_logs(merchant_id);
+
