@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#070d18">
+    <title>Payrail — Merchant Sign In & Registration</title>
+    <meta name="description" content="Secure merchant authentication with email 2FA OTP, scrypt password encryption, and instant dashboard access.">
+    <link rel="stylesheet" href="./landing.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+      body {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        padding: 40px 16px;
+      }
+      .auth-container {
+        width: 100%;
+        max-width: 500px;
+        margin: 0 auto;
+      }
+      .auth-header {
+        text-align: center;
+        margin-bottom: 24px;
+      }
+      .auth-brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 1.6rem;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        margin-bottom: 8px;
+      }
+      .auth-brand span {
+        background: linear-gradient(135deg, #00f0ff, #10b981);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      .auth-sub {
+        font-size: 0.95rem;
+        color: var(--text-muted);
+      }
+      .back-to-home {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.88rem;
+        font-weight: 600;
+        color: var(--text-sub);
+        margin-top: 24px;
+        transition: color 0.2s ease;
+      }
+      .back-to-home:hover {
+        color: var(--accent-cyan);
+      }
+      .already-logged-card {
+        display: none;
+        background: rgba(16, 185, 129, 0.12);
+        border: 1px solid rgba(16, 185, 129, 0.35);
+        border-radius: var(--radius-lg);
+        padding: 24px;
+        text-align: center;
+        margin-bottom: 20px;
+      }
+    </style>
+  </head>
+  <body>
+
+    <div class="auth-container">
+      
+      <!-- Brand & Header -->
+      <div class="auth-header">
+        <a href="/" class="auth-brand">
+          <span style="font-size: 1.8rem;">⚡</span>
+          PAYRAIL <span>GATEWAY</span>
+        </a>
+        <p class="auth-sub" id="auth-sub-text">High-Security Merchant Portal</p>
+      </div>
+
+      <!-- Already Logged In Notice -->
+      <div class="already-logged-card" id="card-already-logged">
+        <div style="font-size: 1.1rem; font-weight: 700; color: #10b981; margin-bottom: 6px;">
+          ✓ You are already signed in!
+        </div>
+        <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 16px;">
+          Authenticated as: <strong id="logged-user-name" style="color: #fff;"></strong>
+        </p>
+        <div style="display: flex; gap: 10px; justify-content: center;">
+          <a href="/dashboard" class="btn btn-emerald btn-sm">Enter Dashboard →</a>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-switch-account">Switch Account</button>
+        </div>
+      </div>
+
+      <!-- Auth Box -->
+      <div class="auth-card" id="main-auth-box">
+
+        <!-- Tabs -->
+        <div class="auth-tabs">
+          <button type="button" class="tab-btn active" id="tab-login" data-tab="login">Sign In</button>
+          <button type="button" class="tab-btn" id="tab-signup" data-tab="signup">Create Business Account</button>
+        </div>
+
+        <!-- ============================================== -->
+        <!-- SIGN IN SECTION                                -->
+        <!-- ============================================== -->
+        <div id="container-login">
+          <div id="alert-login" class="alert-box alert-danger"></div>
+
+          <!-- Step 1: Login Credentials -->
+          <form id="form-login-step1">
+            <div class="form-group">
+              <label class="form-label">Registered Business Email</label>
+              <input type="email" id="login-email" class="form-input" placeholder="name@yourbusiness.com" required autocomplete="username">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Password</label>
+              <input type="password" id="login-password" class="form-input" placeholder="••••••••••••" required autocomplete="current-password">
+            </div>
+
+            <button type="submit" id="btn-submit-login" class="btn btn-primary btn-block" style="margin-top: 8px;">
+              Continue with 2FA Code →
+            </button>
+
+            <div class="security-footer-note">
+              <span>🛡️</span> Protected by 15-minute brute-force lockout & scrypt encryption
+            </div>
+          </form>
+
+          <!-- Step 2: Login 2FA OTP -->
+          <form id="form-login-step2" style="display: none;">
+            <div class="otp-box">
+              <div style="font-weight: 700; color: var(--accent-cyan); font-size: 1rem;">Enter 2FA Security Code</div>
+              <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">
+                We sent a 6-digit verification code to <strong id="otp-login-email-preview" style="color: #fff;"></strong>
+              </p>
+
+              <input type="text" id="login-otp-code" class="otp-input-field" maxlength="6" inputmode="numeric" placeholder="123456" autocomplete="one-time-code" required>
+            </div>
+
+            <button type="submit" id="btn-verify-login" class="btn btn-emerald btn-block">
+              Verify & Enter Dashboard →
+            </button>
+
+            <div class="resend-row">
+              <button type="button" class="link-btn" id="btn-back-login">← Change Credentials</button>
+              <button type="button" class="link-btn" id="btn-resend-login-otp">Resend Code</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- ============================================== -->
+        <!-- SIGN UP SECTION                                -->
+        <!-- ============================================== -->
+        <div id="container-signup" style="display: none;">
+          <div id="alert-signup" class="alert-box alert-danger"></div>
+
+          <!-- Step 1: Registration Form -->
+          <form id="form-signup-step1">
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">First Name</label>
+                <input type="text" id="reg-firstname" class="form-input" placeholder="Satoshi" required autocomplete="given-name">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Last Name</label>
+                <input type="text" id="reg-lastname" class="form-input" placeholder="Nakamoto" required autocomplete="family-name">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Business / Brand Name</label>
+              <input type="text" id="reg-businessname" class="form-input" placeholder="Apex Global Mart" required autocomplete="organization">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Business Email</label>
+              <input type="email" id="reg-email" class="form-input" placeholder="name@yourbusiness.com" required autocomplete="email">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Password (min 8 characters)</label>
+              <input type="password" id="reg-password" class="form-input" placeholder="••••••••••••" minlength="8" required autocomplete="new-password">
+            </div>
+
+            <button type="submit" id="btn-submit-signup" class="btn btn-primary btn-block" style="margin-top: 8px;">
+              Send 6-Digit Email Code →
+            </button>
+
+            <div class="security-footer-note">
+              <span>⚡</span> No KYC documents required. Isolated wallet created instantly.
+            </div>
+          </form>
+
+          <!-- Step 2: Signup OTP Verification -->
+          <form id="form-signup-step2" style="display: none;">
+            <div class="otp-box">
+              <div style="font-weight: 700; color: var(--accent-cyan); font-size: 1rem;">Confirm Your Email</div>
+              <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">
+                Enter the 6-digit code sent to <strong id="otp-signup-email-preview" style="color: #fff;"></strong>
+              </p>
+
+              <input type="text" id="reg-otp-code" class="otp-input-field" maxlength="6" inputmode="numeric" placeholder="123456" autocomplete="one-time-code" required>
+            </div>
+
+            <button type="submit" id="btn-verify-signup" class="btn btn-emerald btn-block">
+              Verify Code & Enter Dashboard →
+            </button>
+
+            <div class="resend-row">
+              <button type="button" class="link-btn" id="btn-back-signup">← Change Email</button>
+              <button type="button" class="link-btn" id="btn-resend-signup-otp">Resend Code</button>
+            </div>
+          </form>
+        </div>
+
+      </div>
+
+      <!-- Back Link -->
+      <div style="text-align: center;">
+        <a href="/" class="back-to-home">
+          ← Back to Homepage & Security Specs
+        </a>
+      </div>
+
+    </div>
+
+    <!-- Auth Script -->
+    <script src="./auth.js"></script>
+  </body>
+</html>

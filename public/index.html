@@ -29,8 +29,8 @@
         </nav>
 
         <div class="nav-actions">
-          <a href="#auth-section" class="btn btn-ghost btn-sm" id="nav-btn-auth" onclick="switchTab('login')">Sign In</a>
-          <a href="#auth-section" class="btn btn-primary btn-sm" onclick="switchTab('signup')">Create Account</a>
+          <a href="/login" class="btn btn-ghost btn-sm" id="nav-btn-auth">Sign In</a>
+          <a href="/signup" class="btn btn-primary btn-sm">Create Account</a>
         </div>
       </div>
     </header>
@@ -87,131 +87,55 @@
               </div>
 
               <div style="display: flex; gap: 14px; margin-top: 12px; flex-wrap: wrap;">
-                <a href="#auth-section" class="btn btn-primary" id="hero-cta-btn" onclick="switchTab('signup')">
+                <a href="/signup" class="btn btn-primary" id="hero-cta-btn">
                   Start Accepting Crypto Free →
                 </a>
-                <a href="#security" class="btn btn-ghost">
-                  Explore Security Specs
+                <a href="/login" class="btn btn-ghost">
+                  Merchant Sign In
                 </a>
               </div>
             </div>
 
-            <!-- Hero Right: Interactive 2-Step Auth Card -->
-            <div class="auth-card" id="auth-section">
-
-              <div class="auth-tabs">
-                <button type="button" class="tab-btn active" data-tab="signup">Create Business Account</button>
-                <button type="button" class="tab-btn" data-tab="login">Sign In</button>
+            <!-- Hero Right: Live Interactive Gateway Showcase Card -->
+            <div class="auth-card" style="border-color: rgba(0, 240, 255, 0.35); box-shadow: 0 20px 50px rgba(0,0,0,0.5), 0 0 35px rgba(0,240,255,0.08);">
+              
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 14px; border-bottom: 1px solid rgba(255,255,255,0.08);">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="display: inline-block; width: 10px; height: 10px; background: #10b981; border-radius: 50%; box-shadow: 0 0 10px #10b981;"></span>
+                  <span style="font-weight: 700; font-size: 0.95rem; color: #fff;">GATEWAY TERMINAL</span>
+                </div>
+                <span class="pill-badge" style="font-size: 0.72rem; padding: 4px 10px; border-color: rgba(16, 185, 129, 0.3); color: #10b981; background: rgba(16, 185, 129, 0.08);">
+                  BSC Mainnet (ID: 56)
+                </span>
               </div>
 
-              <!-- SIGNUP CONTAINER -->
-              <div id="container-signup">
-                <div id="alert-signup" class="alert-box alert-danger"></div>
-
-                <!-- Step 1: Merchant Details Form -->
-                <form id="form-signup-step1">
-                  <div class="form-row">
-                    <div class="form-group">
-                      <label class="form-label">First Name</label>
-                      <input type="text" id="reg-firstname" class="form-input" placeholder="e.g. Satoshi" required>
-                    </div>
-                    <div class="form-group">
-                      <label class="form-label">Last Name</label>
-                      <input type="text" id="reg-lastname" class="form-input" placeholder="e.g. Nakamoto" required>
-                    </div>
-                  </div>
-
-                  <div class="form-group">
-                    <label class="form-label">Business / Store Name</label>
-                    <input type="text" id="reg-businessname" class="form-input" placeholder="e.g. Apex Global Mart" required>
-                  </div>
-
-                  <div class="form-group">
-                    <label class="form-label">Business Email</label>
-                    <input type="email" id="reg-email" class="form-input" placeholder="name@yourbusiness.com" required>
-                  </div>
-
-                  <div class="form-group">
-                    <label class="form-label">Password (min 8 characters)</label>
-                    <input type="password" id="reg-password" class="form-input" placeholder="••••••••••••" minlength="8" required>
-                  </div>
-
-                  <button type="submit" id="btn-submit-signup" class="btn btn-primary btn-block" style="margin-top: 6px;">
-                    Send 6-Digit Email Code →
-                  </button>
-
-                  <div class="security-footer-note">
-                    <span>🔒</span> Passwords protected with high-work-factor scrypt hashing
-                  </div>
-                </form>
-
-                <!-- Step 2: Signup 6-digit OTP Form -->
-                <form id="form-signup-step2" style="display: none;">
-                  <div class="otp-box">
-                    <div style="font-weight: 700; color: var(--accent-cyan); font-size: 0.95rem;">Enter 6-Digit Verification Code</div>
-                    <p style="font-size: 0.82rem; color: var(--text-muted); margin-top: 4px;">
-                      We sent a secure one-time code to <strong id="otp-signup-email-preview" style="color: #fff;"></strong>
-                    </p>
-
-                    <input type="text" id="reg-otp-code" class="otp-input-field" maxlength="6" inputmode="numeric" placeholder="123456" autocomplete="one-time-code" required>
-                  </div>
-
-                  <button type="submit" id="btn-verify-signup" class="btn btn-emerald btn-block">
-                    Verify Code & Enter Dashboard →
-                  </button>
-
-                  <div class="resend-row">
-                    <button type="button" class="link-btn" id="btn-back-signup">← Change Email</button>
-                    <button type="button" class="link-btn" id="btn-resend-signup-otp">Resend Code</button>
-                  </div>
-                </form>
+              <!-- Terminal Preview Box -->
+              <div style="background: rgba(7, 13, 24, 0.9); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: var(--radius-md); padding: 18px; margin-bottom: 20px; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;">
+                <div style="color: var(--text-muted); margin-bottom: 8px;">
+                  <span style="color: var(--accent-cyan);">$</span> payrail.verifySecurityEngine()
+                </div>
+                <div style="color: #6ee7b7; margin-bottom: 4px;">✔ BIP-44 HD Wallet Isolation: ACTIVE</div>
+                <div style="color: #6ee7b7; margin-bottom: 4px;">✔ Hostinger SMTP 2FA OTP: ACTIVE</div>
+                <div style="color: #6ee7b7; margin-bottom: 4px;">✔ 15-Minute Account Lockout: ARMED</div>
+                <div style="color: #6ee7b7; margin-bottom: 4px;">✔ BSC Finality Guard: 12 BLOCKS</div>
+                <div style="color: #6ee7b7; margin-bottom: 8px;">✔ Append-Only Audit Logging: VERIFIED</div>
+                <div style="color: var(--accent-blue); padding-top: 6px; border-top: 1px dashed rgba(255,255,255,0.1);">
+                  &gt; Settlement: 0% Chargebacks | 0 Gas Internal
+                </div>
               </div>
 
-              <!-- LOGIN CONTAINER -->
-              <div id="container-login" style="display: none;">
-                <div id="alert-login" class="alert-box alert-danger"></div>
+              <!-- Action Buttons -->
+              <div style="display: flex; flex-direction: column; gap: 10px;">
+                <a href="/signup" class="btn btn-emerald btn-block" style="font-size: 0.98rem; padding: 13px;">
+                  Create Free Merchant Account →
+                </a>
+                <a href="/login" class="btn btn-ghost btn-block" style="font-size: 0.92rem; padding: 11px;">
+                  Sign In to Your Dashboard
+                </a>
+              </div>
 
-                <!-- Step 1: Login Credentials Form -->
-                <form id="form-login-step1">
-                  <div class="form-group">
-                    <label class="form-label">Registered Business Email</label>
-                    <input type="email" id="login-email" class="form-input" placeholder="name@yourbusiness.com" required>
-                  </div>
-
-                  <div class="form-group">
-                    <label class="form-label">Password</label>
-                    <input type="password" id="login-password" class="form-input" placeholder="••••••••••••" required>
-                  </div>
-
-                  <button type="submit" id="btn-submit-login" class="btn btn-primary btn-block" style="margin-top: 6px;">
-                    Continue with 2FA OTP →
-                  </button>
-
-                  <div class="security-footer-note">
-                    <span>🛡️</span> Protected by 15-minute brute-force account lockout
-                  </div>
-                </form>
-
-                <!-- Step 2: Login 6-digit 2FA OTP Form -->
-                <form id="form-login-step2" style="display: none;">
-                  <div class="otp-box">
-                    <div style="font-weight: 700; color: var(--accent-cyan); font-size: 0.95rem;">Enter 2FA Security Code</div>
-                    <p style="font-size: 0.82rem; color: var(--text-muted); margin-top: 4px;">
-                      Dispatched to <strong id="otp-login-email-preview" style="color: #fff;"></strong>
-                    </p>
-
-                    <input type="text" id="login-otp-code" class="otp-input-field" maxlength="6" inputmode="numeric" placeholder="123456" autocomplete="one-time-code" required>
-                  </div>
-
-                  <button type="submit" id="btn-verify-login" class="btn btn-emerald btn-block">
-                    Verify & Access Dashboard →
-                  </button>
-
-                  <div class="resend-row">
-                    <button type="button" class="link-btn" id="btn-back-login">← Change Credentials</button>
-                    <button type="button" class="link-btn" id="btn-resend-login-otp">Resend Code</button>
-                  </div>
-                </form>
+              <div class="security-footer-note" style="margin-top: 18px;">
+                <span>🔒</span> Instant setup • Zero documents required • Non-custodial
               </div>
 
             </div>
@@ -399,9 +323,9 @@
           <div class="steps-grid">
             <div class="step-card">
               <div class="step-num">01</div>
-              <h3 class="step-title">Register & Verify</h3>
+              <h3 class="step-title">Register in 60s</h3>
               <p class="step-desc">
-                Enter your business name and email above. Enter the 6-digit OTP code sent to your inbox. Your isolated crypto wallet and live API keys are provisioned instantly.
+                Visit <a href="/signup" style="color: var(--accent-cyan); text-decoration: underline;">/signup</a> and enter your business name and email. Enter the 6-digit OTP code sent to your inbox. Your isolated wallet and live API keys are provisioned instantly.
               </p>
             </div>
 
@@ -432,9 +356,14 @@
             <p class="cta-subtitle">
               Join merchants processing seamless on-chain crypto transactions with zero chargebacks and military-grade isolation.
             </p>
-            <a href="#auth-section" class="btn btn-primary" onclick="switchTab('signup')">
-              Create Your Merchant Account Free →
-            </a>
+            <div style="display: flex; gap: 14px; flex-wrap: wrap; justify-content: center;">
+              <a href="/signup" class="btn btn-primary" style="padding: 13px 28px; font-size: 1rem;">
+                Create Your Merchant Account Free →
+              </a>
+              <a href="/login" class="btn btn-ghost" style="padding: 13px 24px; font-size: 1rem;">
+                Already Registered? Sign In
+              </a>
+            </div>
           </div>
         </div>
       </section>
@@ -455,7 +384,8 @@
           <a href="#benefits">Benefits</a>
           <a href="#security">Security Specs</a>
           <a href="#solutions">Solutions</a>
-          <a href="/dashboard">Merchant Dashboard</a>
+          <a href="/login">Merchant Sign In</a>
+          <a href="/signup">Sign Up</a>
           <a href="/health" target="_blank">Network Status</a>
         </div>
       </div>

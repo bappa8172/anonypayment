@@ -115,6 +115,14 @@ app.use('/v1', publicRouter);
 // ============================================================
 // PAGE ENTRY POINTS
 // ============================================================
+app.get('/login', (req, res) => {
+  res.sendFile(path.join(publicDir, 'auth.html'));
+});
+
+app.get('/signup', (req, res) => {
+  res.sendFile(path.join(publicDir, 'auth.html'));
+});
+
 app.get('/pay', (req, res) => {
   res.sendFile(path.join(publicDir, 'pay.html'));
 });

@@ -970,7 +970,7 @@ function startCooldownTimer(buttonEl, secEl, cooldownSec) {
 async function checkAuth() {
   if (!authToken) {
     currentUser = null;
-    window.location.href = '/?auth=login';
+    window.location.href = '/login';
     return false;
   }
 
@@ -991,7 +991,7 @@ async function checkAuth() {
   currentUser = null;
   authToken = '';
   localStorage.removeItem('payrail_token');
-  window.location.href = '/?auth=login';
+  window.location.href = '/login';
   return false;
 }
 
@@ -1350,7 +1350,7 @@ document.getElementById('btn-logout')?.addEventListener('click', () => {
   authToken = '';
   localStorage.removeItem('payrail_token');
   currentUser = null;
-  window.location.href = '/?auth=logout';
+  window.location.href = '/login?logged_out=1';
 });
 
 document.getElementById('btn-open-auth-modal')?.addEventListener('click', () => {
