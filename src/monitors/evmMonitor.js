@@ -112,8 +112,30 @@ async function confirmObservedPayments() {
           rawReceipt = receipt.toJSON();
         }
       } else {
-        // Fallback confirmations increment
-        confirmations = 2;
+        // Look up detected block head and timestamp from recorded transactions
+        const txRes = await query(
+          'SELECT raw, created_at FROM transactions WHERE invoice_id = $1 ORDER BY created_at DESC LIMIT 1',
+          [invoice.id]
+        );
+        let detectedBlock = null;
+        let detectedTime = null;
+        if (txRes.rows.length) {
+          try {
+            const rawObj = typeof txRes.rows[0].raw === 'string' ? JSON.parse(txRes.rows[0].raw) : txRes.rows[0].raw;
+            if (rawObj?.head) detectedBlock = Number(rawObj.head);
+          } catch {}
+          if (txRes.rows[0].created_at) detectedTime = new Date(txRes.rows[0].created_at).getTime();
+        }
+
+        if (detectedBlock && head >= detectedBlock) {
+          confirmations = head - detectedBlock + 1;
+        } else if (detectedTime) {
+          const elapsedSec = Math.max(1, Math.floor((Date.now() - detectedTime) / 1000));
+          // BSC averages ~3s per block
+          confirmations = Math.min(100, Math.floor(elapsedSec / 3) + 1);
+        } else {
+          confirmations = invoice.confirmations_required || 12;
+        }
       }
 
       if (confirmations >= invoice.confirmations_required) {
@@ -121,12 +143,18 @@ async function confirmObservedPayments() {
           txid: invoice.txid,
           amountUnits: invoice.amount_units,
           confirmations,
-          raw: rawReceipt || { confirmedAt: new Date().toISOString(), head },
+          raw: rawReceipt || { confirmedAt: new Date().toISOString(), head, finalConfirmations: confirmations },
         });
         await emitStatusWebhook(invoice, status, invoice.txid, confirmations);
         if (status === 'confirmed') {
           maybeAutoSweep(invoice.id);
         }
+      } else {
+        // Keep confirmations updated in transactions table for live UI tracking
+        await query(
+          'UPDATE transactions SET confirmations = $1, updated_at = datetime("now") WHERE invoice_id = $2 AND txid = $3',
+          [confirmations, invoice.id, invoice.txid]
+        );
       }
     } catch (err) {
       logger.warn({ err: err.message, invoiceId: invoice.id }, 'Error confirming observed payment');

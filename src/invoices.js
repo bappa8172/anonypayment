@@ -116,22 +116,37 @@ export async function createInvoice({
 }
 
 export async function getInvoice(id) {
-  const res = await query('SELECT * FROM invoices WHERE id = $1', [id]);
+  const res = await query(`
+    SELECT i.*, COALESCE(t.confirmations, 0) as confirmations
+    FROM invoices i
+    LEFT JOIN (
+      SELECT invoice_id, MAX(confirmations) as confirmations
+      FROM transactions GROUP BY invoice_id
+    ) t ON t.invoice_id = i.id
+    WHERE i.id = $1
+  `, [id]);
   return res.rows[0];
 }
 
 export async function listInvoices({ limit = 50, status = null, merchantId = null } = {}) {
-  let q = 'SELECT * FROM invoices';
+  let q = `
+    SELECT i.*, COALESCE(t.confirmations, 0) as confirmations
+    FROM invoices i
+    LEFT JOIN (
+      SELECT invoice_id, MAX(confirmations) as confirmations
+      FROM transactions GROUP BY invoice_id
+    ) t ON t.invoice_id = i.id
+  `;
   const params = [];
   const whereClauses = [];
 
   if (status) {
     params.push(status);
-    whereClauses.push(`status = $${params.length}`);
+    whereClauses.push(`i.status = $${params.length}`);
   }
   if (merchantId) {
     params.push(merchantId);
-    whereClauses.push(`merchant_id = $${params.length}`);
+    whereClauses.push(`i.merchant_id = $${params.length}`);
   }
 
   if (whereClauses.length > 0) {
@@ -139,7 +154,7 @@ export async function listInvoices({ limit = 50, status = null, merchantId = nul
   }
 
   params.push(limit);
-  q += ` ORDER BY created_at DESC LIMIT $${params.length}`;
+  q += ` ORDER BY i.created_at DESC LIMIT $${params.length}`;
 
   const res = await query(q, params);
   return res.rows;
@@ -295,9 +310,10 @@ export function publicInvoice(invoice) {
     paidAt: invoice.paid_at,
     confirmedAt: invoice.confirmed_at,
     txid: invoice.txid,
+    confirmations: invoice.confirmations !== undefined ? invoice.confirmations : (invoice.status === 'confirmed' ? invoice.confirmations_required : (invoice.status === 'paid' ? 1 : 0)),
+    confirmationsRequired: invoice.confirmations_required,
     tokenContract: invoice.token_contract,
     paymentUri,
-    confirmationsRequired: invoice.confirmations_required,
     explorerTx: invoice.txid ? `${asset.explorerTx}${invoice.txid}` : null,
     explorerAddress: `${asset.explorerAddress}${invoice.address}`,
   };
@@ -359,17 +375,20 @@ export async function listPaymentLinks({ limit = 50, merchantId = null } = {}) {
 export async function getGatewayStats(merchantId = null) {
   let totalInvoicesRes;
   let confirmedInvoicesRes;
+  let paidInvoicesRes;
   let pendingInvoicesRes;
   let transactionsRes;
 
   if (merchantId) {
     totalInvoicesRes = await query('SELECT COUNT(*) as count FROM invoices WHERE merchant_id = $1', [merchantId]);
     confirmedInvoicesRes = await query("SELECT COUNT(*) as count FROM invoices WHERE status = 'confirmed' AND merchant_id = $1", [merchantId]);
+    paidInvoicesRes = await query("SELECT COUNT(*) as count FROM invoices WHERE status = 'paid' AND merchant_id = $1", [merchantId]);
     pendingInvoicesRes = await query("SELECT COUNT(*) as count FROM invoices WHERE status = 'pending' AND merchant_id = $1", [merchantId]);
     transactionsRes = await query('SELECT COUNT(*) as count FROM transactions t JOIN invoices i ON t.invoice_id = i.id WHERE i.merchant_id = $1', [merchantId]);
   } else {
     totalInvoicesRes = await query('SELECT COUNT(*) as count FROM invoices');
     confirmedInvoicesRes = await query("SELECT COUNT(*) as count FROM invoices WHERE status = 'confirmed'");
+    paidInvoicesRes = await query("SELECT COUNT(*) as count FROM invoices WHERE status = 'paid'");
     pendingInvoicesRes = await query("SELECT COUNT(*) as count FROM invoices WHERE status = 'pending'");
     transactionsRes = await query('SELECT COUNT(*) as count FROM transactions');
   }
@@ -377,6 +396,7 @@ export async function getGatewayStats(merchantId = null) {
   return {
     totalInvoices: parseInt(totalInvoicesRes.rows[0]?.count || '0', 10),
     confirmedInvoices: parseInt(confirmedInvoicesRes.rows[0]?.count || '0', 10),
+    paidInvoices: parseInt(paidInvoicesRes.rows[0]?.count || '0', 10),
     pendingInvoices: parseInt(pendingInvoicesRes.rows[0]?.count || '0', 10),
     totalTransactions: parseInt(transactionsRes.rows[0]?.count || '0', 10),
   };

@@ -226,7 +226,8 @@ async function loadOverview() {
     const data = await res.json();
 
     document.getElementById('metric-total-invoices').textContent = data.stats.totalInvoices;
-    document.getElementById('metric-confirmed-invoices').textContent = `${data.stats.confirmedInvoices} Confirmed`;
+    const paidSuffix = data.stats.paidInvoices ? ` (${data.stats.paidInvoices} Confirming)` : '';
+    document.getElementById('metric-confirmed-invoices').textContent = `${data.stats.confirmedInvoices} Confirmed${paidSuffix}`;
     document.getElementById('metric-pending-invoices').textContent = data.stats.pendingInvoices;
 
     currentBalances = data.balances;
@@ -272,6 +273,30 @@ function renderInvoicesTable(tbodyId, invoices, isOverview = false) {
     const shortAddr = `${inv.address.slice(0, 6)}…${inv.address.slice(-4)}`;
     const checkoutUrl = `/pay?invoice=${inv.id}`;
 
+    let badgeHtml = `<span class="badge badge-${inv.status}">${inv.status}</span>`;
+    if (inv.status === 'confirmed') {
+      badgeHtml = `<span class="badge badge-confirmed" style="background: rgba(16, 185, 129, 0.18); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.35); font-weight: 700;">✓ Confirmed</span>`;
+    } else if (inv.status === 'paid') {
+      const conf = inv.confirmations || 1;
+      const req = inv.confirmations_required || 12;
+      badgeHtml = `<span class="badge badge-paid" style="background: rgba(245, 158, 11, 0.18); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.35); font-weight: 700;">⚡ Paid (${conf}/${req})</span>`;
+    } else if (inv.status === 'pending') {
+      badgeHtml = `<span class="badge badge-pending">Pending</span>`;
+    } else if (inv.status === 'expired') {
+      badgeHtml = `<span class="badge badge-expired" style="background: rgba(239, 68, 68, 0.15); color: #f87171;">Expired</span>`;
+    }
+
+    let txDisplay = '—';
+    if (inv.txid) {
+      if (inv.txid.startsWith('0x')) {
+        txDisplay = `<a href="${getTxExplorerUrl(inv.txid, inv.currency)}" target="_blank" style="color: #38bdf8;">${inv.txid.slice(0, 10)}… ↗</a>`;
+      } else if (inv.txid.startsWith('onchain-')) {
+        txDisplay = `<a href="${getAddressExplorerUrl(inv.address, inv.currency)}" target="_blank" style="color: #38bdf8;" title="View On-Chain on BscScan">On-Chain BSC ↗</a>`;
+      } else {
+        txDisplay = `<code>${inv.txid.slice(0, 10)}…</code>`;
+      }
+    }
+
     return `
       <tr>
         <td>
@@ -282,11 +307,11 @@ function renderInvoicesTable(tbodyId, invoices, isOverview = false) {
         <td><strong>${inv.amount} ${inv.currency.split('_')[0]}</strong></td>
         ${isOverview ? `<td>${inv.currency.split('_')[1] || 'EVM'}</td>` : `<td>${inv.currency}</td>`}
         <td>
-          <span class="badge badge-${inv.status}">${inv.status}</span>
+          ${badgeHtml}
           ${inv.receipt_email_sent ? '<div style="font-size:0.72rem; color:#34d399; margin-top:2px;">✓ Receipt Emailed</div>' : ''}
         </td>
         <td><code title="${inv.address}">${shortAddr}</code></td>
-        ${!isOverview ? `<td>${inv.txid ? `<a href="${inv.txid.startsWith('0x') ? getTxExplorerUrl(inv.txid, inv.currency) : '#'}" target="_blank">${inv.txid.slice(0, 10)}… ↗</a>` : '—'}</td>` : ''}
+        ${!isOverview ? `<td>${txDisplay}</td>` : ''}
         <td>${date}</td>
         <td>
           <div style="display:inline-flex; gap:6px; align-items:center;">

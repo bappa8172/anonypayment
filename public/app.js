@@ -156,12 +156,23 @@ function renderInvoice(invoice) {
 
   if (invoice.status === 'confirmed') {
     statusIndicator.className = 'status-indicator confirmed';
-    statusText.innerHTML = `<strong>Payment Confirmed!</strong> (12/12 Confirmations)`;
+    const conf = invoice.confirmations || invoice.confirmationsRequired || 12;
+    const req = invoice.confirmationsRequired || 12;
+    statusText.innerHTML = `<strong>✓ Payment Confirmed!</strong> (${conf}/${req} Confirmations)`;
     statusText.style.color = '#10b981';
     timerValue.textContent = 'Completed';
     timerValue.style.color = '#10b981';
     if (timerInterval) clearInterval(timerInterval);
     if (pollInterval) clearInterval(pollInterval);
+  } else if (invoice.status === 'paid') {
+    statusIndicator.className = 'status-indicator paid';
+    const conf = invoice.confirmations || 1;
+    const req = invoice.confirmationsRequired || 12;
+    statusText.innerHTML = `<strong>⚡ Payment Detected!</strong> Confirming on BSC (${conf}/${req} Confirmations)`;
+    statusText.style.color = '#38bdf8';
+    timerValue.textContent = 'Confirming…';
+    timerValue.style.color = '#38bdf8';
+    if (timerInterval) clearInterval(timerInterval);
   } else if (invoice.status === 'expired') {
     statusIndicator.className = 'status-indicator expired';
     statusText.textContent = 'Invoice expired';
