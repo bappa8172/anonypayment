@@ -80,7 +80,7 @@ router.get('/payment-links/:code', async (req, res, next) => {
   }
 });
 
-// 5. Checkout from Payment Link
+// 5. Checkout from Payment Link (POST - API JSON response)
 router.post('/payment-links/:code/checkout', async (req, res, next) => {
   try {
     const link = await getPaymentLinkByCode(req.params.code);
@@ -89,6 +89,10 @@ router.post('/payment-links/:code/checkout', async (req, res, next) => {
     const invoice = await createInvoice({
       currency: link.currency,
       amount: link.amount,
+      merchantId: link.merchant_id || null,
+      walletId: link.wallet_id || 'default',
+      description: link.title,
+      orderId: `LINK-${link.code}`,
       metadata: { paymentLinkCode: link.code, title: link.title },
     });
     return res.json(invoice);
@@ -96,5 +100,27 @@ router.post('/payment-links/:code/checkout', async (req, res, next) => {
     return next(error);
   }
 });
+
+// 6. Checkout from Payment Link (GET - browser direct redirect)
+router.get('/payment-links/:code/checkout', async (req, res, next) => {
+  try {
+    const link = await getPaymentLinkByCode(req.params.code);
+    if (!link) return res.status(404).redirect('/pay?error=link_not_found');
+
+    const invoice = await createInvoice({
+      currency: link.currency,
+      amount: link.amount,
+      merchantId: link.merchant_id || null,
+      walletId: link.wallet_id || 'default',
+      description: link.title,
+      orderId: `LINK-${link.code}`,
+      metadata: { paymentLinkCode: link.code, title: link.title },
+    });
+    return res.redirect(`/pay?invoice=${invoice.id}`);
+  } catch (error) {
+    return next(error);
+  }
+});
+
 
 export default router;

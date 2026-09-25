@@ -3,92 +3,165 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#09111f">
+    <meta name="theme-color" content="#050a14">
     <title>Payrail — Crypto Checkout</title>
+    <meta name="description" content="High-security on-chain crypto checkout with instant BSC settlement and automated email receipts.">
     <link rel="stylesheet" href="./styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
   </head>
   <body>
+
+    <!-- Cyber Grid Background -->
+    <div class="cyber-grid-bg"></div>
+
+    <!-- Ambient Glowing Background Orbs -->
+    <div class="ambient-glow-wrap">
+      <div class="ambient-orb orb-1"></div>
+      <div class="ambient-orb orb-2"></div>
+    </div>
+
+    <!-- Main Shell -->
     <main class="shell" aria-live="polite">
+
+      <!-- Brand Bar -->
       <div class="brand">
-        <a href="/dashboard" class="brand-link">
-          <span class="mark">⚡</span> Payrail <span>Checkout</span>
+        <a href="/" class="brand-link">
+          <span class="mark">⚡</span> PAYRAIL <span>CHECKOUT</span>
         </a>
       </div>
 
+      <!-- MAIN PAYMENT CARD -->
       <section class="card" id="payment-card">
+
+        <!-- Card Header -->
         <div class="card-header">
-          <p class="eyebrow">Crypto Invoice</p>
-          <span class="network-badge" id="network-badge">BSC Network</span>
+          <span class="eyebrow" id="merchant-name-label">CRYPTO INVOICE</span>
+          <span class="network-badge" id="network-badge">
+            <span class="pulse-dot"></span>
+            <span>BSC Network</span>
+          </span>
         </div>
 
-        <div id="order-meta-box" style="display: none; margin-bottom: 12px; padding: 10px 14px; background: rgba(255,255,255,0.04); border-radius: 10px; border-left: 3px solid #00f0ff;">
+        <!-- Order Meta Details -->
+        <div id="order-meta-box" style="display: none; margin-bottom: 14px; padding: 10px 14px; background: rgba(255,255,255,0.035); border-radius: 10px; border-left: 3px solid #00f0ff;">
           <div id="order-ref-badge" style="font-size: 0.78rem; font-weight: 700; color: #38bdf8;"></div>
           <div id="order-desc" style="font-size: 0.85rem; color: #cbd5e1; margin-top: 2px;"></div>
         </div>
 
+        <!-- Amount & Copy -->
         <div class="amount-wrap">
           <h1 id="amount">Loading…</h1>
-          <button class="copy-btn mini" id="copy-amount" title="Copy exact amount">Copy Amount</button>
+          <button class="copy-btn" id="copy-amount" title="Copy exact amount">Copy Amount</button>
         </div>
 
-        <p class="network-desc" id="network-desc">Send exact crypto on the specified network</p>
+        <p class="network-desc" id="network-desc">Send exact crypto on BNB Smart Chain (BSC Mainnet)</p>
 
-        <div class="qr-container">
-          <div class="qr-box" id="qr-box">
-            <img id="qr-image" alt="Crypto payment QR code" style="display: none;">
-            <div id="qr-loading" class="qr-skeleton">Generating QR…</div>
-          </div>
-          <p class="qr-hint">Scan with Binance, Trust Wallet, MetaMask, or any crypto wallet</p>
-        </div>
-
-        <div class="field-label">Deposit Address</div>
-        <div class="address-row">
-          <code id="address">—</code>
-          <button class="copy-btn" id="copy-address" disabled>Copy</button>
-        </div>
-
-        <div class="web3-actions">
-          <button class="web3-btn" id="pay-metamask" style="display: none;">
-            <span class="wallet-icon">🦊</span> Pay with MetaMask / Web3
+        <!-- Payment Mode Tabs (QR Code vs Web3 Direct) -->
+        <div class="checkout-tabs">
+          <button type="button" class="checkout-tab-btn active" id="tab-btn-qr" onclick="switchCheckoutTab('qr')">
+            📱 QR & Deposit Address
           </button>
-          <div id="web3-status" class="web3-note"></div>
+          <button type="button" class="checkout-tab-btn" id="tab-btn-web3" onclick="switchCheckoutTab('web3')">
+            🦊 Pay with Web3 Wallet
+          </button>
+        </div>
+
+        <!-- TAB 1: QR & Manual Address Container -->
+        <div id="checkout-tab-qr-container">
+          <!-- Animated Laser QR Box -->
+          <div class="qr-container">
+            <div class="qr-box" id="qr-box">
+              <div class="laser-scan-line"></div>
+              <img id="qr-image" alt="Crypto payment QR code" style="display: none;">
+              <div id="qr-loading" class="qr-skeleton">Generating QR…</div>
+            </div>
+            <p class="qr-hint">Scan with Binance, Trust Wallet, MetaMask, or any Web3 wallet</p>
+          </div>
+
+          <!-- Deposit Address -->
+          <div class="field-label">Deposit Address</div>
+          <div class="address-row">
+            <code id="address">—</code>
+            <button class="copy-btn" id="copy-address" disabled>Copy</button>
+          </div>
+        </div>
+
+        <!-- TAB 2: Direct Web3 / MetaMask Container -->
+        <div id="checkout-tab-web3-container" style="display: none;">
+          <div style="text-align: center; padding: 24px 12px; background: rgba(0,0,0,0.3); border-radius: var(--radius-md); margin-bottom: 18px; border: 1px dashed rgba(249, 115, 22, 0.4);">
+            <div style="font-size: 2.4rem; margin-bottom: 8px;">🦊</div>
+            <div style="font-weight: 700; font-size: 1rem; color: #fff; margin-bottom: 4px;">Direct Web3 One-Click Payment</div>
+            <p style="font-size: 0.84rem; color: var(--text-muted); margin-bottom: 18px;">
+              Connect your MetaMask or Trust Wallet extension to sign and broadcast this payment directly.
+            </p>
+            <button type="button" class="web3-btn" id="pay-metamask">
+              <span>⚡</span> Send Transaction with Web3
+            </button>
+            <div id="web3-status" class="web3-note"></div>
+          </div>
         </div>
 
         <!-- Email Receipt Input for Payer -->
-        <div class="receipt-email-section" id="receipt-email-section" style="margin: 18px 0; padding: 14px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 12px;">
-          <div style="font-size: 0.8rem; font-weight: 600; color: #34d399; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-            <span>📧</span> Get Payment Receipt by Email
+        <div class="receipt-email-section" id="receipt-email-section">
+          <div style="font-size: 0.8rem; font-weight: 700; color: #34d399; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+            <span>✉️</span> Get Automated Official Receipt by Email
           </div>
           <div style="display: flex; gap: 8px;">
-            <input type="email" id="customer-email-input" placeholder="Enter your email for official receipt" style="flex: 1; padding: 8px 12px; background: #08111e; border: 1px solid #1e293b; border-radius: 8px; color: #f8fafc; font-size: 0.85rem; outline: none;">
-            <button id="btn-save-email" style="padding: 8px 14px; background: #10b981; border: none; border-radius: 8px; color: white; font-weight: 600; font-size: 0.85rem; cursor: pointer;">Save</button>
+            <input type="email" id="customer-email-input" placeholder="buyer@example.com" style="flex: 1; padding: 10px 14px; background: #050a14; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; color: #f8fafc; font-size: 0.88rem; outline: none;">
+            <button id="btn-save-email" style="padding: 10px 18px; background: #10b981; border: none; border-radius: 8px; color: white; font-weight: 700; font-size: 0.88rem; cursor: pointer; transition: transform 0.2s ease;">
+              Save
+            </button>
           </div>
           <div id="email-status-msg" style="font-size: 0.75rem; margin-top: 6px; min-height: 16px;"></div>
         </div>
 
+        <!-- On-Chain Confirmation Status -->
         <div class="status-box" id="status-box">
           <div class="status-indicator" id="status-indicator"></div>
-          <span id="status-text">Checking invoice status…</span>
+          <span id="status-text">Checking on-chain network status…</span>
         </div>
 
+        <!-- Explorer Link -->
         <div class="tx-link-row" id="tx-link-row" style="display: none;">
           <span>On-Chain Tx: </span>
-          <a id="tx-link" href="#" target="_blank" rel="noopener noreferrer">View on Explorer ↗</a>
+          <a id="tx-link" href="#" target="_blank" rel="noopener noreferrer">View on BscScan ↗</a>
         </div>
 
+        <!-- Expiry Countdown -->
         <div class="footer-timer">
           <span id="timer-label">Expires in:</span>
           <strong id="timer-value">—:—</strong>
         </div>
+
+      </section>
+
+      <!-- NO INVOICE DETECTED FALLBACK CARD (hidden by default) -->
+      <section class="card no-invoice-box" id="no-invoice-card" style="display: none;">
+        <span class="no-invoice-icon">💳</span>
+        <h2 class="no-invoice-title">No Active Checkout Detected</h2>
+        <p class="no-invoice-desc">
+          To complete a payment, please use the payment link provided by your merchant, or generate an invoice in the merchant portal.
+        </p>
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <a href="/" style="display: inline-block; padding: 12px; background: #00f0ff; color: #000; font-weight: 700; border-radius: 8px; text-decoration: none;">
+            ← Go to Payrail Homepage
+          </a>
+          <a href="/login" style="display: inline-block; padding: 10px; background: rgba(255,255,255,0.06); color: #fff; font-weight: 600; border-radius: 8px; text-decoration: none; border: 1px solid rgba(255,255,255,0.12);">
+            Merchant Dashboard Sign In
+          </a>
+        </div>
       </section>
 
       <p class="disclaimer">
-        🔒 Real-time on-chain verification. Always double check network before sending.
+        🔒 Real-time on-chain verification. BSC Mainnet Chain ID: 56. Always verify network before sending.
       </p>
+
     </main>
+
+    <!-- Floating Toast Notification -->
+    <div class="toast-msg" id="toast-msg">Copied to clipboard! ✓</div>
 
     <script src="./app.js"></script>
   </body>

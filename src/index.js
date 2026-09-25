@@ -127,6 +127,28 @@ app.get('/pay', (req, res) => {
   res.sendFile(path.join(publicDir, 'pay.html'));
 });
 
+// Clean payment link resolution: /link/:code -> generates invoice -> opens checkout
+app.get('/link/:code', async (req, res) => {
+  try {
+    const { getPaymentLinkByCode, createInvoice } = await import('./invoices.js');
+    const link = await getPaymentLinkByCode(req.params.code);
+    if (!link) return res.redirect('/pay?error=link_not_found');
+
+    const invoice = await createInvoice({
+      currency: link.currency,
+      amount: link.amount,
+      merchantId: link.merchant_id || null,
+      walletId: link.wallet_id || 'default',
+      description: link.title,
+      orderId: `LINK-${link.code}`,
+      metadata: { paymentLinkCode: link.code, title: link.title },
+    });
+    return res.redirect(`/pay?invoice=${invoice.id}`);
+  } catch (err) {
+    return res.redirect(`/pay?error=${encodeURIComponent(err.message)}`);
+  }
+});
+
 app.get('/dashboard', (req, res) => {
   res.sendFile(path.join(publicDir, 'dashboard.html'));
 });

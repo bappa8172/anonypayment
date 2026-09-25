@@ -436,7 +436,7 @@ async function loadPaymentLinks() {
     tbody.innerHTML = data.links.map(link => {
       const date = new Date(link.created_at).toLocaleDateString();
       const origin = window.location.origin;
-      const payUrl = `${origin}/v1/payment-links/${link.code}/checkout`;
+      const payUrl = `${origin}/link/${link.code}`;
 
       return `
         <tr>
@@ -491,7 +491,7 @@ window.copyText = async (text) => {
 
 window.embedSnippet = (code, title, amount) => {
   const origin = window.location.origin;
-  const snippet = `<!-- Payrail Crypto Button -->\n<a href="${origin}/v1/payment-links/${code}/checkout" target="_blank" style="background:#00f0ff; color:#000; padding:10px 18px; border-radius:8px; font-weight:bold; text-decoration:none;">Pay with Crypto (${amount})</a>`;
+  const snippet = `<!-- Payrail Crypto Button -->\n<a href="${origin}/link/${code}" target="_blank" style="background:#00f0ff; color:#000; padding:10px 18px; border-radius:8px; font-weight:bold; text-decoration:none;">Pay with Crypto (${amount})</a>`;
   prompt('Copy this HTML snippet to embed on your website:', snippet);
 };
 
