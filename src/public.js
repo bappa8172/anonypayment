@@ -53,13 +53,13 @@ router.post('/invoices/:id/verify-tx', async (req, res) => {
   }
 });
 
-// 4. Update customer email for invoice receipt
+// 4. Update customer email for invoice receipt (supports both /customer-email and /customer)
 const customerEmailSchema = z.object({
   email: z.string().email('Please provide a valid email address'),
   name: z.string().optional(),
 });
 
-router.post('/invoices/:id/customer-email', async (req, res) => {
+const handleCustomerEmailUpdate = async (req, res) => {
   try {
     const { email, name } = customerEmailSchema.parse(req.body);
     const updated = await updateInvoiceCustomerEmail(req.params.id, email, name);
@@ -67,7 +67,10 @@ router.post('/invoices/:id/customer-email', async (req, res) => {
   } catch (error) {
     return res.status(400).json({ error: error.message });
   }
-});
+};
+
+router.post('/invoices/:id/customer-email', handleCustomerEmailUpdate);
+router.post('/invoices/:id/customer', handleCustomerEmailUpdate);
 
 // 5. Payment Link details
 router.get('/payment-links/:code', async (req, res, next) => {

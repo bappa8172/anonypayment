@@ -360,17 +360,18 @@ btnSaveEmail?.addEventListener('click', async () => {
   btnSaveEmail.textContent = 'Saving…';
 
   try {
-    const res = await fetch(`/v1/invoices/${encodeURIComponent(currentInvoice.id)}/customer`, {
+    const res = await fetch(`/v1/invoices/${encodeURIComponent(currentInvoice.id)}/customer-email`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }),
     });
 
+    const d = await res.json();
     if (res.ok) {
+      if (currentInvoice) currentInvoice.customerEmail = email;
       emailStatusMsg.innerHTML = `<span style="color: #34d399;">✓ Receipt will be emailed to <strong>${email}</strong></span>`;
       showToast('Email saved for receipt! ✓');
     } else {
-      const d = await res.json();
       emailStatusMsg.innerHTML = `<span style="color: #ef4444;">${d.error || 'Failed to save email'}</span>`;
     }
   } catch (e) {
