@@ -137,9 +137,35 @@ export async function sweepInvoice(invoiceId, { force = false } = {}) {
     throw new Error(errorMsg);
   }
 
-  const destinationAddress = getCentralTreasuryAddress();
+  let destinationAddress = null;
+
+  // 1. If invoice belongs to a merchant who configured a personal payout address:
+  if (invoice.merchant_id) {
+    const mRes = await query('SELECT payout_address, auto_forward FROM merchants WHERE id = $1', [invoice.merchant_id]);
+    if (mRes.rows.length && mRes.rows[0].payout_address && ethers.isAddress(mRes.rows[0].payout_address)) {
+      destinationAddress = ethers.getAddress(mRes.rows[0].payout_address);
+      logger.info(
+        { invoiceId: invoice.id, merchantId: invoice.merchant_id, destinationAddress },
+        'Routing on-chain payment directly to merchant personal payout address'
+      );
+    }
+  }
+
+  // 2. If no merchant payout address, check if admin configured a cold storage vault:
+  if (!destinationAddress) {
+    const coldStorageRes = await query("SELECT value FROM settings WHERE key = 'cold_storage_address'");
+    if (coldStorageRes.rows.length && coldStorageRes.rows[0].value && ethers.isAddress(coldStorageRes.rows[0].value)) {
+      destinationAddress = ethers.getAddress(coldStorageRes.rows[0].value);
+    }
+  }
+
+  // 3. Fallback to Central Treasury Vault address:
+  if (!destinationAddress) {
+    destinationAddress = getCentralTreasuryAddress();
+  }
+
   if (invoice.address.toLowerCase() === destinationAddress.toLowerCase()) {
-    // Address is already the central treasury address
+    // Address is already the destination address
     await query(
       "UPDATE invoices SET sweep_status = 'swept', swept_amount = $1, swept_at = datetime('now') WHERE id = $2",
       [invoice.amount, invoice.id]

@@ -8,7 +8,9 @@ import {
   verifySignupOtp,
   requestLoginOtp,
   verifyLoginOtp,
+  updateMerchantPayoutSettings,
 } from './auth.js';
+import { query } from './db.js';
 import { authRateLimit, authenticate, assertTrustedWebhookUrl } from './security.js';
 import { auditLog, getClientIp } from './audit.js';
 
@@ -181,6 +183,8 @@ router.post('/login', authRateLimit({ windowMs: 60_000, max: 15 }), async (req, 
 router.get('/me', authenticate, async (req, res) => {
   try {
     if (req.user.role === 'admin') {
+      const coldRes = await query("SELECT value FROM settings WHERE key = 'cold_storage_address'");
+      const autoSweepRes = await query("SELECT value FROM settings WHERE key = 'auto_sweep_enabled'");
       return res.json({
         user: {
           id: 'admin',
@@ -189,6 +193,8 @@ router.get('/me', authenticate, async (req, res) => {
           role: 'admin',
           status: 'active',
           walletId: 'default',
+          payoutAddress: coldRes.rows[0]?.value || null,
+          autoForward: autoSweepRes.rows[0]?.value !== 'false',
         },
       });
     }
@@ -209,6 +215,8 @@ router.get('/me', authenticate, async (req, res) => {
         apiKey: merchant.api_key,
         webhookSecret: merchant.webhook_secret,
         webhookUrl: merchant.webhook_url,
+        payoutAddress: merchant.payout_address || null,
+        autoForward: merchant.auto_forward !== 0,
         createdAt: merchant.created_at,
       },
     });
@@ -217,7 +225,49 @@ router.get('/me', authenticate, async (req, res) => {
   }
 });
 
-// 4. Logout
+// 4. Update Personal Payout / Settlement Address
+const payoutSettingsSchema = z.object({
+  payoutAddress: z.string().optional().nullable(),
+  autoForward: z.boolean().optional(),
+});
+
+router.post('/profile/payout-address', authenticate, async (req, res) => {
+  try {
+    const { payoutAddress, autoForward } = payoutSettingsSchema.parse(req.body);
+
+    if (req.user.role === 'admin') {
+      if (payoutAddress && payoutAddress.trim()) {
+        const { ethers } = await import('ethers');
+        if (!ethers.isAddress(payoutAddress.trim())) {
+          return res.status(400).json({ error: 'Invalid EVM 0x address' });
+        }
+        await query(
+          `INSERT INTO settings (key, value) VALUES ('cold_storage_address', $1)
+           ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+          [ethers.getAddress(payoutAddress.trim())]
+        );
+      }
+      if (autoForward !== undefined) {
+        await query(
+          `INSERT INTO settings (key, value) VALUES ('auto_sweep_enabled', $1)
+           ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+          [autoForward ? 'true' : 'false']
+        );
+      }
+      return res.json({ success: true, payoutAddress: payoutAddress?.trim() || null });
+    }
+
+    const updated = await updateMerchantPayoutSettings(req.user.id, {
+      payoutAddress,
+      autoForward,
+    });
+    res.json({ success: true, merchant: updated });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 5. Logout
 router.post('/logout', (req, res) => {
   res.json({ message: 'Logged out successfully' });
 });

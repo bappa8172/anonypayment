@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
+import { ethers } from 'ethers';
 import { query } from './db.js';
 import { config } from './config.js';
 import { getOrCreateWallet } from './wallet.js';
@@ -714,6 +715,32 @@ export async function setMerchantStatus(merchantId, status) {
   );
   if (res.rows.length === 0) throw new Error('Merchant not found');
   logger.info({ merchantId, status }, 'Merchant account status updated by admin');
+  return res.rows[0];
+}
+
+/**
+ * Updates merchant personal payout / settlement address and auto-forward preference.
+ */
+export async function updateMerchantPayoutSettings(merchantId, { payoutAddress, autoForward }) {
+  let cleanAddress = null;
+  if (payoutAddress && payoutAddress.trim()) {
+    const trimmed = payoutAddress.trim();
+    if (!ethers.isAddress(trimmed)) {
+      throw new Error(`Invalid EVM payout address: ${trimmed}. Must be a valid 0x address.`);
+    }
+    cleanAddress = ethers.getAddress(trimmed);
+  }
+
+  const autoFwdInt = autoForward === false ? 0 : 1;
+  const res = await query(
+    `UPDATE merchants
+     SET payout_address = $1, auto_forward = $2, updated_at = datetime('now')
+     WHERE id = $3
+     RETURNING id, email, business_name, payout_address, auto_forward`,
+    [cleanAddress, autoFwdInt, merchantId]
+  );
+  if (res.rows.length === 0) throw new Error('Merchant not found');
+  logger.info({ merchantId, payoutAddress: cleanAddress, autoForward: autoFwdInt }, 'Merchant payout settings updated');
   return res.rows[0];
 }
 

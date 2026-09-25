@@ -309,6 +309,41 @@
           <div class="wallet-balances-grid" id="wallet-cards-grid">
             <!-- Populated via JS -->
           </div>
+
+          <!-- Personal Settlement / Payout Destination Card -->
+          <div class="section-card" style="margin-top: 24px; border: 1px solid rgba(16, 185, 129, 0.35); background: linear-gradient(135deg, rgba(16, 185, 129, 0.05), rgba(6, 78, 59, 0.15)); border-radius: 14px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; margin-bottom: 16px;">
+              <div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="font-size: 1.4rem;">💼</span>
+                  <h3 style="color: #34d399; margin: 0;">My Personal Payout / Settlement Destination</h3>
+                  <span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #34d399; font-weight: 700;">Direct Funds Routing</span>
+                </div>
+                <p class="section-desc" style="margin-top: 6px;">
+                  Configure where your customer payments reach you. Enter your personal Binance, MetaMask, Trust Wallet, or cold storage address (BEP-20 EVM 0x...).
+                </p>
+              </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 14px;">
+              <div class="form-group" style="margin: 0;">
+                <label style="font-weight: 700; color: #f1f5f9;">Personal Receiving EVM Wallet Address (0x...)</label>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                  <input type="text" id="merchant-payout-address-input" class="form-input" placeholder="e.g. 0x71C... (Your Personal MetaMask / Binance / Trust Wallet Address)" style="flex: 1; font-family: 'JetBrains Mono', monospace; font-size: 0.88rem; min-width: 280px;">
+                  <button type="button" class="btn btn-primary" id="btn-save-merchant-payout" style="white-space: nowrap;">💾 Save Payout Address</button>
+                </div>
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,0.3); padding: 12px 16px; border-radius: 8px; border: 1px solid var(--border);">
+                <input type="checkbox" id="merchant-auto-forward-check" style="width: 18px; height: 18px; accent-color: var(--accent-cyan); cursor: pointer;" checked>
+                <label for="merchant-auto-forward-check" style="margin: 0; font-size: 0.88rem; font-weight: 600; color: #e2e8f0; cursor: pointer;">
+                  ⚡ <strong>Auto-Forward Payments:</strong> Automatically sweep every confirmed customer payment directly into my personal wallet address above.
+                </label>
+              </div>
+
+              <div id="merchant-payout-status-msg" style="font-size: 0.84rem; display: none;"></div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -714,7 +749,10 @@ app.post('/api/crypto-webhook', express.raw({ type: 'application/json' }), (req,
           <div id="withdraw-avail-bal" class="avail-badge">Loading…</div>
         </div>
         <div class="form-group">
-          <label>Destination Address (0x...)</label>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <label style="margin: 0;">Destination Address (0x...)</label>
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-use-saved-payout-addr" style="display: none; padding: 3px 10px; font-size: 0.76rem;">⚡ Use My Saved Address</button>
+          </div>
           <input type="text" class="form-input" id="withdraw-to-address" placeholder="0x..." required>
         </div>
         <div class="form-group">

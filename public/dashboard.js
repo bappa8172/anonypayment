@@ -196,11 +196,19 @@ document.getElementById('btn-wallet-deposit')?.addEventListener('click', () => {
   openModal('modal-deposit');
   loadDepositAddress();
 });
-document.getElementById('btn-quick-withdraw').addEventListener('click', () => {
+document.getElementById('btn-quick-withdraw')?.addEventListener('click', () => {
+  if (currentUser && currentUser.payoutAddress) {
+    const addrField = document.getElementById('withdraw-to-address');
+    if (addrField) addrField.value = currentUser.payoutAddress;
+  }
   openModal('modal-withdraw');
   updateWithdrawAvailableBal();
 });
 document.getElementById('btn-wallet-withdraw')?.addEventListener('click', () => {
+  if (currentUser && currentUser.payoutAddress) {
+    const addrField = document.getElementById('withdraw-to-address');
+    if (addrField) addrField.value = currentUser.payoutAddress;
+  }
   openModal('modal-withdraw');
   updateWithdrawAvailableBal();
 });
@@ -356,6 +364,10 @@ document.getElementById('btn-copy-deposit-addr')?.addEventListener('click', func
 // Withdraw flow
 window.openWithdrawFor = (currency) => {
   document.getElementById('withdraw-currency').value = currency;
+  if (currentUser && currentUser.payoutAddress) {
+    const addrField = document.getElementById('withdraw-to-address');
+    if (addrField) addrField.value = currentUser.payoutAddress;
+  }
   openModal('modal-withdraw');
   updateWithdrawAvailableBal();
 };
@@ -1177,7 +1189,97 @@ function renderUserSession(user) {
     document.getElementById('mch-status-badge').className = user.status === 'suspended' ? 'status-suspended' : 'status-active';
   }
   updateCodeSnippets(user.apiKey || 'YOUR_API_KEY');
+
+  // Populate Personal Payout / Settlement Destination
+  const payoutInput = document.getElementById('merchant-payout-address-input');
+  const autoFwdCheck = document.getElementById('merchant-auto-forward-check');
+  const payoutStatusEl = document.getElementById('merchant-payout-status-msg');
+  const btnUseSaved = document.getElementById('btn-use-saved-payout-addr');
+
+  if (payoutInput) {
+    payoutInput.value = user.payoutAddress || '';
+  }
+  if (autoFwdCheck) {
+    autoFwdCheck.checked = user.autoForward !== false;
+  }
+  if (btnUseSaved) {
+    btnUseSaved.style.display = user.payoutAddress ? 'inline-block' : 'none';
+  }
+  if (payoutStatusEl) {
+    payoutStatusEl.style.display = 'block';
+    if (user.payoutAddress) {
+      payoutStatusEl.innerHTML = `<span style="color:#34d399; font-weight:700;">✓ Active Settlement Destination:</span> <code style="color:#00f0ff;">${user.payoutAddress}</code> — On-chain payments automatically route to your personal wallet.`;
+    } else {
+      payoutStatusEl.innerHTML = `<span style="color:#94a3b8;">No personal settlement address saved yet. Save your address above so payments reach your personal wallet.</span>`;
+    }
+  }
 }
+
+// Save Merchant Personal Payout Address
+document.getElementById('btn-save-merchant-payout')?.addEventListener('click', async function() {
+  const addrInput = document.getElementById('merchant-payout-address-input');
+  const autoFwdCheck = document.getElementById('merchant-auto-forward-check');
+  const statusEl = document.getElementById('merchant-payout-status-msg');
+  const btn = this;
+
+  const payoutAddress = addrInput?.value.trim() || '';
+  const autoForward = autoFwdCheck ? autoFwdCheck.checked : true;
+
+  if (payoutAddress && !/^0x[a-fA-F0-9]{40}$/.test(payoutAddress)) {
+    showToast('Invalid address! Must be a valid 42-character 0x EVM address', 'error');
+    if (statusEl) {
+      statusEl.style.display = 'block';
+      statusEl.innerHTML = '<span style="color:#ef4444; font-weight:700;">✗ Please enter a valid BEP-20 / EVM address starting with 0x (42 characters).</span>';
+    }
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+
+  try {
+    const res = await fetch('/auth/profile/payout-address', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ payoutAddress, autoForward }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to save payout address');
+
+    if (currentUser) {
+      currentUser.payoutAddress = payoutAddress;
+      currentUser.autoForward = autoForward;
+    }
+
+    showToast('Payout address saved! Customer payments will reach you directly. ✓', 'success');
+
+    const btnUseSaved = document.getElementById('btn-use-saved-payout-addr');
+    if (btnUseSaved) btnUseSaved.style.display = payoutAddress ? 'inline-block' : 'none';
+
+    if (statusEl) {
+      statusEl.style.display = 'block';
+      if (payoutAddress) {
+        statusEl.innerHTML = `<span style="color:#34d399; font-weight:700;">✓ Active Settlement Destination:</span> <code style="color:#00f0ff;">${payoutAddress}</code> — On-chain payments automatically route to your personal wallet.`;
+      } else {
+        statusEl.innerHTML = `<span style="color:#94a3b8;">No personal settlement address saved yet. Save your address above so payments reach your personal wallet.</span>`;
+      }
+    }
+  } catch (err) {
+    showToast(`Error: ${err.message}`, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '💾 Save Payout Address';
+  }
+});
+
+// Use saved payout address in withdraw modal
+document.getElementById('btn-use-saved-payout-addr')?.addEventListener('click', () => {
+  if (currentUser?.payoutAddress) {
+    document.getElementById('withdraw-to-address').value = currentUser.payoutAddress;
+    showToast('Pre-filled with your saved payout address! ✓');
+  }
+});
 
 window.switchAuthTab = (tab) => {
   const signinContainer = document.getElementById('auth-signin-container');

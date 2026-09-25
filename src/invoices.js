@@ -199,21 +199,45 @@ export async function recordEvmPayment(invoice, { txid, amountUnits, confirmatio
       );
       logger.info({ invoiceId: invoice.id, walletId: targetWalletId, amountUnits: amountUnits.toString() }, 'Settled invoice payment into merchant wallet');
 
-      // Dispatch automated emails to business owner and customer receipt
-      try {
-        const freshInvoice = await getInvoice(invoice.id);
-        await notifyPaymentReceived({
-          invoice: freshInvoice,
-          txid,
-          confirmations,
-        });
-      } catch (mailErr) {
-        logger.warn({ err: mailErr.message, invoiceId: invoice.id }, 'Failed to dispatch payment notification emails');
+        // Dispatch automated emails to business owner and customer receipt
+        try {
+          const freshInvoice = await getInvoice(invoice.id);
+          await notifyPaymentReceived({
+            invoice: freshInvoice,
+            txid,
+            confirmations,
+          });
+        } catch (mailErr) {
+          logger.warn({ err: mailErr.message, invoiceId: invoice.id }, 'Failed to dispatch payment notification emails');
+        }
+
+        // Automated on-chain sweep / auto-forward directly to merchant personal address or treasury
+        (async () => {
+          try {
+            const autoSweepRes = await query("SELECT value FROM settings WHERE key = 'auto_sweep_enabled'");
+            const globalAutoSweep = autoSweepRes.rows.length === 0 || autoSweepRes.rows[0].value !== 'false';
+            if (globalAutoSweep) {
+              let shouldSweep = true;
+              if (invoice.merchant_id) {
+                const mRes = await query('SELECT auto_forward FROM merchants WHERE id = $1', [invoice.merchant_id]);
+                if (mRes.rows.length && mRes.rows[0].auto_forward === 0) {
+                  shouldSweep = false;
+                }
+              }
+              if (shouldSweep) {
+                const { sweepInvoice } = await import('./sweeper.js');
+                await sweepInvoice(invoice.id);
+                logger.info({ invoiceId: invoice.id }, 'Automated on-chain sweep completed on confirmation');
+              }
+            }
+          } catch (sweepErr) {
+            logger.warn({ err: sweepErr.message, invoiceId: invoice.id }, 'Automated background sweep notice');
+          }
+        })();
+      } catch (settleErr) {
+        logger.error({ err: settleErr.message, invoiceId: invoice.id }, 'Failed to settle invoice to wallet');
       }
-    } catch (settleErr) {
-      logger.error({ err: settleErr.message, invoiceId: invoice.id }, 'Failed to settle invoice to wallet');
     }
-  }
 
   return status;
 }

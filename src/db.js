@@ -171,6 +171,12 @@ export async function initDb() {
       if (!mchCols.has('last_name')) {
         await query("ALTER TABLE merchants ADD COLUMN last_name TEXT");
       }
+      if (!mchCols.has('payout_address')) {
+        await query("ALTER TABLE merchants ADD COLUMN payout_address TEXT");
+      }
+      if (!mchCols.has('auto_forward')) {
+        await query("ALTER TABLE merchants ADD COLUMN auto_forward INTEGER DEFAULT 1");
+      }
 
       await query("CREATE INDEX IF NOT EXISTS idx_merchants_email ON merchants(email)");
       await query("CREATE INDEX IF NOT EXISTS idx_merchants_api_key ON merchants(api_key)");
