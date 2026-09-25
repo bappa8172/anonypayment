@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#070d18">
+    <meta name="theme-color" content="#050a14">
     <title>Payrail — High-Security Crypto Payment Gateway & Wallet</title>
     <meta name="description" content="Non-custodial, high-security crypto payment gateway for businesses. Zero chargebacks, automated invoicing, 2FA OTP verification, and instant BSC settlement.">
     <link rel="stylesheet" href="./landing.css">
@@ -12,6 +12,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
   </head>
   <body>
+
+    <!-- Cyber Grid Background -->
+    <div class="cyber-grid-bg"></div>
 
     <!-- Ambient Glowing Background Orbs -->
     <div class="ambient-glow-wrap">
@@ -31,7 +34,7 @@
         <nav class="nav-links">
           <a href="#benefits" class="nav-link">Benefits</a>
           <a href="#security" class="nav-link">Safety & Protection</a>
-          <a href="#solutions" class="nav-link">What It Helps</a>
+          <a href="#calculator" class="nav-link">Savings Calculator</a>
           <a href="#how-it-works" class="nav-link">How It Works</a>
         </nav>
 
@@ -63,17 +66,19 @@
             <!-- Hero Left: Pitch & Value Proposition -->
             <div class="hero-content">
               <div class="pill-badge">
-                <span>🛡️</span> Military-Grade Security • BSC Mainnet • Zero KYC Friction
+                <span class="pulse-dot"></span>
+                <span>MILITARY-GRADE SECURITY • BSC MAINNET • ZERO KYC FRICTION</span>
               </div>
 
               <h1 class="hero-title">
-                The High-Security <span>Crypto Gateway</span> Built for Real Business
+                The High-Security <span class="text-shimmer">Crypto Gateway</span> Built for Real Business
               </h1>
 
               <p class="hero-subtitle">
                 Accept crypto payments directly to your isolated non-custodial wallet with zero chargebacks, automated customer invoicing, instant email receipts, and military-grade OTP security. No paperwork required to start.
               </p>
 
+              <!-- Metrics -->
               <div class="hero-metrics">
                 <div class="metric-item">
                   <div class="metric-num">0%</div>
@@ -93,68 +98,134 @@
                 </div>
               </div>
 
-              <div style="display: flex; gap: 14px; margin-top: 12px; flex-wrap: wrap;">
-                <a href="/signup" class="btn btn-primary" id="hero-cta-btn">
-                  Start Accepting Crypto Free →
-                </a>
-                <a href="/login" class="btn btn-ghost">
-                  Merchant Sign In
-                </a>
+              <!-- Single, High-Impact CTA Row -->
+              <div>
+                <div style="display: flex; gap: 14px; flex-wrap: wrap;">
+                  <a href="/signup" class="btn btn-primary" id="hero-cta-btn" style="padding: 14px 28px; font-size: 1rem;">
+                    Start Accepting Crypto Free →
+                  </a>
+                  <a href="/login" class="btn btn-ghost" style="padding: 14px 24px; font-size: 1rem;">
+                    Merchant Sign In
+                  </a>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: var(--text-sub); margin-top: 14px;">
+                  <span style="color: #10b981;">●</span> Live BSC Gas: <strong>3 Gwei</strong> • Settlement: <strong>2.8s avg</strong> • <strong>0 KYC Wait</strong>
+                </div>
               </div>
+
             </div>
 
-            <!-- Hero Right: Live Interactive Gateway Showcase Card -->
-            <div class="auth-card" style="border-color: rgba(0, 240, 255, 0.35); box-shadow: 0 20px 50px rgba(0,0,0,0.5), 0 0 35px rgba(0,240,255,0.08);">
-              
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 14px; border-bottom: 1px solid rgba(255,255,255,0.08);">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <span style="display: inline-block; width: 10px; height: 10px; background: #10b981; border-radius: 50%; box-shadow: 0 0 10px #10b981;"></span>
-                  <span style="font-weight: 700; font-size: 0.95rem; color: #fff;">GATEWAY TERMINAL</span>
-                </div>
-                <span class="pill-badge" style="font-size: 0.72rem; padding: 4px 10px; border-color: rgba(16, 185, 129, 0.3); color: #10b981; background: rgba(16, 185, 129, 0.08);">
-                  BSC Mainnet (ID: 56)
-                </span>
+            <!-- Hero Right: Interactive Live Sandbox Checkout Widget -->
+            <div style="position: relative;">
+
+              <!-- Floating Ambient Badges -->
+              <div class="float-badge float-badge-top">
+                <span class="pulse-dot"></span>
+                <span>BSC Mainnet • ID: 56</span>
+              </div>
+              <div class="float-badge float-badge-bottom">
+                <span>🔒</span>
+                <span>Anti-IDOR Isolated Ledger</span>
               </div>
 
-              <!-- Terminal Preview Box -->
-              <div style="background: rgba(5, 10, 20, 0.95); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: var(--radius-md); padding: 20px; margin-bottom: 22px; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; box-shadow: inset 0 2px 10px rgba(0,0,0,0.5);">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 0.76rem; color: var(--text-sub);">
-                  <span>STATUS: LIVE ENGINE</span>
-                  <span style="display: flex; align-items: center; gap: 6px;">
+              <!-- Sandbox Card -->
+              <div class="sandbox-card">
+                
+                <!-- Card Header -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 14px; border-bottom: 1px solid rgba(255,255,255,0.08);">
+                  <div style="display: flex; align-items: center; gap: 8px;">
                     <span class="pulse-dot"></span>
-                    <span style="color: var(--accent-emerald);">P2P SYNCED</span>
-                  </span>
-                </div>
-                <div style="color: var(--text-muted); margin-bottom: 8px;">
-                  <span style="color: var(--accent-cyan);">$</span> payrail.verifySecurityEngine()
-                </div>
-                <div style="color: #6ee7b7; margin-bottom: 4px;">✔ BIP-44 HD Derivation: <span style="color: #fff;">100% ISOLATED</span></div>
-                <div style="color: #6ee7b7; margin-bottom: 4px;">✔ 2FA Hostinger SMTP OTP: <span style="color: #fff;">ENABLED</span></div>
-                <div style="color: #6ee7b7; margin-bottom: 4px;">✔ 15-Min Brute-Force Lockout: <span style="color: #fff;">ACTIVE</span></div>
-                <div style="color: #6ee7b7; margin-bottom: 4px;">✔ BSC Finality Guard: <span style="color: #fff;">12 CONFIRMATIONS</span></div>
-                <div style="color: #6ee7b7; margin-bottom: 12px;">✔ Immutable Audit Ledger: <span style="color: #fff;">tamper_proof</span></div>
-                <div style="background: rgba(0, 240, 255, 0.08); border: 1px solid rgba(0, 240, 255, 0.25); border-radius: 6px; padding: 10px 12px; color: var(--accent-cyan); font-size: 0.8rem;">
-                  ⚡ Real-Time Settlement: <strong>0% Chargebacks</strong> • <strong>0 Gas Internal</strong>
-                </div>
-              </div>
+                    <span style="font-weight: 800; font-size: 0.92rem; letter-spacing: 0.5px; color: #fff;">LIVE CHECKOUT DEMO</span>
+                  </div>
 
-              <!-- Action Buttons -->
-              <div style="display: flex; flex-direction: column; gap: 10px;">
-                <a href="/signup" class="btn btn-emerald btn-block" style="font-size: 0.98rem; padding: 13px;">
-                  Create Free Merchant Account →
-                </a>
-                <a href="/login" class="btn btn-ghost btn-block" style="font-size: 0.92rem; padding: 11px;">
-                  Sign In to Your Dashboard
-                </a>
-              </div>
+                  <!-- Currency Switcher Pill -->
+                  <div class="currency-selector">
+                    <button type="button" class="currency-btn active" id="demo-currency-bnb" onclick="setDemoCurrency('BNB')">BNB</button>
+                    <button type="button" class="currency-btn" id="demo-currency-usdt" onclick="setDemoCurrency('USDT')">USDT</button>
+                  </div>
+                </div>
 
-              <div class="security-footer-note" style="margin-top: 18px;">
-                <span>🔒</span> Instant setup • Zero documents required • Non-custodial
+                <!-- Animated Laser Scanner Box with Mock QR -->
+                <div class="qr-scanner-box">
+                  <div class="laser-scan-line"></div>
+                  <div class="qr-mock-matrix">
+                    <div class="qr-dot"></div><div class="qr-dot"></div><div class="qr-dot"></div><div class="qr-dot off"></div><div class="qr-dot"></div><div class="qr-dot"></div><div class="qr-dot"></div>
+                    <div class="qr-dot"></div><div class="qr-dot off"></div><div class="qr-dot"></div><div class="qr-dot"></div><div class="qr-dot off"></div><div class="qr-dot off"></div><div class="qr-dot"></div>
+                    <div class="qr-dot"></div><div class="qr-dot"></div><div class="qr-dot off"></div><div class="qr-dot"></div><div class="qr-dot"></div><div class="qr-dot"></div><div class="qr-dot off"></div>
+                    <div class="qr-dot off"></div><div class="qr-dot"></div><div class="qr-dot"></div><div class="qr-dot off"></div><div class="qr-dot"></div><div class="qr-dot off"></div><div class="qr-dot"></div>
+                    <div class="qr-dot"></div><div class="qr-dot off"></div><div class="qr-dot"></div><div class="qr-dot"></div><div class="qr-dot off"></div><div class="qr-dot"></div><div class="qr-dot"></div>
+                    <div class="qr-dot"></div><div class="qr-dot"></div><div class="qr-dot off"></div><div class="qr-dot off"></div><div class="qr-dot"></div><div class="qr-dot"></div><div class="qr-dot"></div>
+                    <div class="qr-dot"></div><div class="qr-dot off"></div><div class="qr-dot"></div><div class="qr-dot"></div><div class="qr-dot"></div><div class="qr-dot off"></div><div class="qr-dot"></div>
+                  </div>
+                </div>
+
+                <!-- Dynamic Amount & Address Display -->
+                <div style="text-align: center; margin-bottom: 16px;">
+                  <div style="font-size: 1.6rem; font-weight: 800; color: #fff; letter-spacing: -0.02em;" id="demo-amount-text">
+                    0.05 BNB <span style="font-size: 0.95rem; color: var(--text-muted); font-weight: 500;">($32.40 USD)</span>
+                  </div>
+                  <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 6px;">
+                    <code style="font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--accent-cyan); background: rgba(0,0,0,0.5); padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(0,240,255,0.2);" id="demo-address-text">
+                      0x9f8c...dd59
+                    </code>
+                    <button type="button" class="btn btn-ghost btn-sm" id="btn-demo-copy" style="padding: 4px 10px; font-size: 0.74rem;">Copy</button>
+                  </div>
+                </div>
+
+                <!-- Simulation Progress / Result Box -->
+                <div class="conf-progress-wrap" id="demo-progress-box" style="display: none;">
+                  <div style="display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 700;">
+                    <span id="demo-step-text" style="color: var(--accent-cyan);">Awaiting deposit on-chain…</span>
+                    <span id="demo-conf-count" style="color: var(--accent-emerald);">0 / 12</span>
+                  </div>
+                  <div class="conf-bar-track">
+                    <div class="conf-bar-fill" id="demo-progress-bar"></div>
+                  </div>
+                </div>
+
+                <!-- Confirmed Celebration Banner -->
+                <div id="demo-success-box" style="display: none; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.45); border-radius: 8px; padding: 12px; margin-bottom: 16px; font-size: 0.84rem; text-align: center; color: #6ee7b7; animation: fadeIn 0.3s ease;">
+                  <div style="font-weight: 800; font-size: 0.95rem; margin-bottom: 2px;">🎉 Payment Confirmed & Settled!</div>
+                  <div>Funds credited to isolated ledger • Receipt emailed</div>
+                </div>
+
+                <!-- Simulation Trigger Button -->
+                <div style="display: flex; gap: 10px;">
+                  <button type="button" class="btn btn-emerald btn-block" id="btn-trigger-simulation" onclick="runPaymentSimulation()">
+                    ⚡ Simulate Customer Payment
+                  </button>
+                  <button type="button" class="btn btn-ghost btn-sm" id="btn-reset-simulation" onclick="resetPaymentSimulation()" style="display: none; padding: 10px 14px;">
+                    Reset
+                  </button>
+                </div>
+
+                <div class="security-footer-note" style="margin-top: 14px;">
+                  <span>🔒</span> Auto-expires in 30 mins • 0% Chargebacks • 100% Non-Custodial
+                </div>
+
               </div>
 
             </div>
 
           </div>
+        </div>
+      </section>
+
+      <!-- Live Real-Time Blockchain Activity Ticker -->
+      <section class="stream-ticker-wrap">
+        <div class="stream-ticker-track">
+          <div class="ticker-item"><span class="ticker-dot"></span> ⚡ TX #9a4f…b2: <strong>0.25 BNB</strong> received from Trust Wallet • 12/12 Confirmations • 3s ago</div>
+          <div class="ticker-item"><span class="ticker-dot"></span> ⚡ TX #12b7…e9: <strong>150.00 USDT</strong> settled to isolated ledger • Receipt dispatched • 11s ago</div>
+          <div class="ticker-item"><span class="ticker-dot"></span> ⚡ TX #89c1…7a: <strong>0.08 BNB</strong> confirmed on BSC Mainnet • 0% Chargebacks • 24s ago</div>
+          <div class="ticker-item"><span class="ticker-dot"></span> ⚡ TX #44e2…c4: <strong>450.00 USDT</strong> customer checkout completed • Verified in 2.8s • 36s ago</div>
+          <div class="ticker-item"><span class="ticker-dot"></span> ⚡ TX #77d3…f1: <strong>1.20 BNB</strong> internal transfer • 0 Gas Fees • 49s ago</div>
+          <!-- Loop Repeat for Infinite Marquee -->
+          <div class="ticker-item"><span class="ticker-dot"></span> ⚡ TX #9a4f…b2: <strong>0.25 BNB</strong> received from Trust Wallet • 12/12 Confirmations • 3s ago</div>
+          <div class="ticker-item"><span class="ticker-dot"></span> ⚡ TX #12b7…e9: <strong>150.00 USDT</strong> settled to isolated ledger • Receipt dispatched • 11s ago</div>
+          <div class="ticker-item"><span class="ticker-dot"></span> ⚡ TX #89c1…7a: <strong>0.08 BNB</strong> confirmed on BSC Mainnet • 0% Chargebacks • 24s ago</div>
+          <div class="ticker-item"><span class="ticker-dot"></span> ⚡ TX #44e2…c4: <strong>450.00 USDT</strong> customer checkout completed • Verified in 2.8s • 36s ago</div>
+          <div class="ticker-item"><span class="ticker-dot"></span> ⚡ TX #77d3…f1: <strong>1.20 BNB</strong> internal transfer • 0 Gas Fees • 49s ago</div>
         </div>
       </section>
 
@@ -283,7 +354,7 @@
           </div>
 
           <!-- Interactive Savings Calculator Widget -->
-          <div style="margin-top: 48px; background: rgba(5, 10, 20, 0.85); border: 1px solid rgba(0, 240, 255, 0.3); border-radius: var(--radius-lg); padding: 36px; backdrop-filter: blur(20px); box-shadow: 0 16px 40px rgba(0,0,0,0.5);">
+          <div style="margin-top: 48px; background: rgba(5, 10, 20, 0.85); border: 1px solid rgba(0, 240, 255, 0.3); border-radius: var(--radius-lg); padding: 36px; backdrop-filter: blur(20px); box-shadow: 0 16px 40px rgba(0,0,0,0.5);" id="calculator">
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 36px; align-items: center;">
               <div>
                 <span class="pill-badge" style="font-size: 0.75rem; margin-bottom: 12px;">Interactive Savings Calculator</span>
@@ -336,45 +407,6 @@
         </div>
       </section>
 
-      <!-- Section: What It Helps (Solutions) -->
-      <section class="section section-alt" id="solutions">
-        <div class="container">
-          <div class="section-header">
-            <div class="section-tag">Use Cases & Solutions</div>
-            <h2 class="section-title">What Payrail Helps You Accomplish</h2>
-            <p class="section-desc">
-              Whether you are running an online store, a SaaS platform, a digital agency, or cross-border trade, Payrail adapts to your workflow.
-            </p>
-          </div>
-
-          <div class="cards-grid">
-            <div class="feature-card">
-              <div class="feature-icon">🛍️</div>
-              <h3 class="feature-title">E-Commerce & Online Stores</h3>
-              <p class="feature-text">
-                Embed direct crypto checkouts on your product pages. Customers choose BNB or USDT, scan the QR code with their mobile wallet, and the order is marked paid automatically via webhook.
-              </p>
-            </div>
-
-            <div class="feature-card">
-              <div class="feature-icon emerald">💻</div>
-              <h3 class="feature-title">SaaS & Digital Subscriptions</h3>
-              <p class="feature-text">
-                Bill global users for subscriptions, software licenses, or digital downloads without geographic payment restrictions, credit card declination, or currency conversion hurdles.
-              </p>
-            </div>
-
-            <div class="feature-card">
-              <div class="feature-icon amber">🌍</div>
-              <h3 class="feature-title">Cross-Border & B2B Invoicing</h3>
-              <p class="feature-text">
-                Send professional crypto invoices to international clients. Funds arrive in minutes instead of 3–5 business days via SWIFT wire transfers, saving thousands in international banking fees.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
       <!-- Section: How It Works -->
       <section class="section" id="how-it-works">
         <div class="container">
@@ -423,10 +455,10 @@
               Join merchants processing seamless on-chain crypto transactions with zero chargebacks and military-grade isolation.
             </p>
             <div style="display: flex; gap: 14px; flex-wrap: wrap; justify-content: center;">
-              <a href="/signup" class="btn btn-primary" style="padding: 13px 28px; font-size: 1rem;">
+              <a href="/signup" class="btn btn-primary" style="padding: 14px 30px; font-size: 1rem;">
                 Create Your Merchant Account Free →
               </a>
-              <a href="/login" class="btn btn-ghost" style="padding: 13px 24px; font-size: 1rem;">
+              <a href="/login" class="btn btn-ghost" style="padding: 14px 26px; font-size: 1rem;">
                 Already Registered? Sign In
               </a>
             </div>
@@ -449,7 +481,7 @@
         <div class="footer-links">
           <a href="#benefits">Benefits</a>
           <a href="#security">Security Specs</a>
-          <a href="#solutions">Solutions</a>
+          <a href="#calculator">Calculator</a>
           <a href="/login">Merchant Sign In</a>
           <a href="/signup">Sign Up</a>
           <a href="/health" target="_blank">Network Status</a>
