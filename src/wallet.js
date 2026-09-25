@@ -68,6 +68,9 @@ export async function creditWalletBalance(walletId, currency, amountUnits, type,
   const units = BigInt(amountUnits);
   if (units <= 0n) return;
 
+  // Ensure wallet row exists (required for foreign key constraint on balances.wallet_id)
+  await getOrCreateWallet(walletId, `${walletId} Wallet`);
+
   const formattedAmount = ethers.formatUnits(units, asset.decimals);
 
   // Upsert balance

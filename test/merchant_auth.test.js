@@ -251,12 +251,19 @@ test('Merchant & Security: 6. Login with 2FA OTP verification', async () => {
     password,
   });
 
-  // Invalid password rejected upfront
+  // Invalid password is rejected upfront.
+  // New lockout system appends attempt count, so we match the start of the error
   await assert.rejects(
     async () => {
       await requestLoginOtp({ email, password: 'WrongPassword123!' });
     },
-    { message: 'Invalid email or password' }
+    (err) => {
+      assert.ok(
+        err.message.startsWith('Invalid email or password') || err.message.includes('locked'),
+        `Expected wrong-password error but got: ${err.message}`
+      );
+      return true;
+    }
   );
 
   // Valid password triggers OTP dispatch

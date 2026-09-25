@@ -57,6 +57,20 @@ export async function initDb() {
 
     logger.info({ path: dbPath }, 'Using SQLite database');
 
+    // Enable WAL mode for better concurrent read performance and crash safety
+    // Enable foreign key constraints enforcement (off by default in SQLite)
+    await new Promise((resolve, reject) => {
+      sqliteDb.serialize(() => {
+        sqliteDb.run('PRAGMA journal_mode=WAL', (err) => {
+          if (err) logger.warn({ err: err.message }, 'Failed to set WAL mode');
+        });
+        sqliteDb.run('PRAGMA foreign_keys=ON', (err) => {
+          if (err) logger.warn({ err: err.message }, 'Failed to enable foreign keys');
+          else resolve();
+        });
+      });
+    });
+
     const schemaPath = path.join(__dirname, '..', 'sql', 'sqlite_schema.sql');
     if (fs.existsSync(schemaPath)) {
       const schema = fs.readFileSync(schemaPath, 'utf8');
@@ -68,6 +82,7 @@ export async function initDb() {
       });
     }
   }
+
 
   // Ensure default merchant wallet exists
   await query(
@@ -211,6 +226,37 @@ export async function initDb() {
         )
       `);
       await query("CREATE INDEX IF NOT EXISTS idx_invoices_sweep_status ON invoices(sweep_status)");
+
+      // ── lockouts table — tracks failed login attempts for account lockout ──
+      await query(`
+        CREATE TABLE IF NOT EXISTS lockouts (
+          email TEXT PRIMARY KEY,
+          attempt_count INTEGER NOT NULL DEFAULT 0,
+          locked_until TEXT,
+          last_attempt_at TEXT NOT NULL
+        )
+      `);
+
+      // ── audit_logs table — immutable record of all security-sensitive events ──
+      await query(`
+        CREATE TABLE IF NOT EXISTS audit_logs (
+          id TEXT PRIMARY KEY,
+          actor_id TEXT,
+          actor_role TEXT,
+          action TEXT NOT NULL,
+          target_type TEXT,
+          target_id TEXT,
+          ip TEXT,
+          result TEXT NOT NULL DEFAULT 'success',
+          details TEXT,
+          created_at TEXT NOT NULL
+        )
+      `);
+      await query("CREATE INDEX IF NOT EXISTS idx_audit_logs_actor ON audit_logs(actor_id)");
+      await query("CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action)");
+      await query("CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at)");
+      // Index on expires_at for efficient OTP cleanup
+      await query("CREATE INDEX IF NOT EXISTS idx_otps_expires_at ON otps(expires_at)");
     } else {
       await query("ALTER TABLE invoices ADD COLUMN IF NOT EXISTS sweep_status TEXT DEFAULT 'unswept'");
       await query("ALTER TABLE invoices ADD COLUMN IF NOT EXISTS sweep_txid TEXT");
@@ -279,6 +325,36 @@ export async function initDb() {
       await query("CREATE INDEX IF NOT EXISTS idx_payment_links_merchant ON payment_links(merchant_id)");
       await query("CREATE INDEX IF NOT EXISTS idx_email_logs_invoice ON email_logs(invoice_id)");
       await query("CREATE INDEX IF NOT EXISTS idx_email_logs_merchant ON email_logs(merchant_id)");
+
+      // ── lockouts table ──
+      await query(`
+        CREATE TABLE IF NOT EXISTS lockouts (
+          email TEXT PRIMARY KEY,
+          attempt_count INT NOT NULL DEFAULT 0,
+          locked_until TIMESTAMPTZ,
+          last_attempt_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+      `);
+
+      // ── audit_logs table ──
+      await query(`
+        CREATE TABLE IF NOT EXISTS audit_logs (
+          id TEXT PRIMARY KEY,
+          actor_id TEXT,
+          actor_role TEXT,
+          action TEXT NOT NULL,
+          target_type TEXT,
+          target_id TEXT,
+          ip TEXT,
+          result TEXT NOT NULL DEFAULT 'success',
+          details JSONB,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+      `);
+      await query("CREATE INDEX IF NOT EXISTS idx_audit_logs_actor ON audit_logs(actor_id)");
+      await query("CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action)");
+      await query("CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at)");
+      await query("CREATE INDEX IF NOT EXISTS idx_otps_expires_at ON otps(expires_at)");
     }
 
     // Seed master admin account

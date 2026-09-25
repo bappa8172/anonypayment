@@ -24,6 +24,18 @@ async function maybeAutoSweep(invoiceId) {
 
 async function emitStatusWebhook(invoice, status, txid, confirmations) {
   if (invoice.status === status) return;
+
+  // Look up merchant's own webhook_secret for per-merchant HMAC signing
+  let webhookSecret;
+  if (invoice.merchant_id) {
+    try {
+      const mchRes = await query('SELECT webhook_secret FROM merchants WHERE id = $1', [invoice.merchant_id]);
+      webhookSecret = mchRes.rows[0]?.webhook_secret;
+    } catch {
+      // Fall through to platform default
+    }
+  }
+
   await sendWebhook(invoice.webhook_url, {
     event: `invoice.${status}`,
     invoice_id: invoice.id,
@@ -32,7 +44,7 @@ async function emitStatusWebhook(invoice, status, txid, confirmations) {
     amount: invoice.amount,
     currency: invoice.currency,
     confirmations,
-  });
+  }, webhookSecret);
 }
 
 /**

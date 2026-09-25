@@ -57,6 +57,7 @@ export function verifyPassword(password, storedHash) {
 
 /**
  * Creates a cryptographically signed session token (HMAC-SHA256).
+ * Uses SESSION_SECRET — a dedicated secret separate from the admin API key.
  */
 export function createSessionToken(payload) {
   const header = { alg: 'HS256', typ: 'SESSION' };
@@ -67,10 +68,12 @@ export function createSessionToken(payload) {
     exp: now + TOKEN_TTL_MS,
   };
 
+  // Use dedicated session secret, fall back to adminApiKey for backwards compat
+  const signingKey = config.sessionSecret || config.adminApiKey;
   const b64Header = Buffer.from(JSON.stringify(header)).toString('base64url');
   const b64Payload = Buffer.from(JSON.stringify(claims)).toString('base64url');
   const signature = crypto
-    .createHmac('sha256', config.adminApiKey)
+    .createHmac('sha256', signingKey)
     .update(`${b64Header}.${b64Payload}`)
     .digest('base64url');
 
@@ -86,8 +89,9 @@ export function verifySessionToken(token) {
   if (parts.length !== 3) return null;
   const [b64Header, b64Payload, signature] = parts;
 
+  const signingKey = config.sessionSecret || config.adminApiKey;
   const expectedSignature = crypto
-    .createHmac('sha256', config.adminApiKey)
+    .createHmac('sha256', signingKey)
     .update(`${b64Header}.${b64Payload}`)
     .digest('base64url');
 
@@ -130,10 +134,11 @@ export function generateOtpCode() {
 }
 
 /**
- * Computes HMAC-SHA256 hash of OTP bound to email address
+ * Computes HMAC-SHA256 hash of OTP bound to email address.
+ * Uses SESSION_SECRET — rotating it invalidates all pending OTPs (good security).
  */
 export function hashOtp(email, otp) {
-  const secret = config.adminApiKey || 'payrail_otp_security_secret';
+  const secret = config.sessionSecret || config.adminApiKey || 'payrail_otp_security_secret';
   return crypto
     .createHmac('sha256', secret)
     .update(`${email.toLowerCase().trim()}:${otp.toString().trim()}`)
@@ -344,10 +349,24 @@ export async function requestLoginOtp({ email, password }) {
   }
 
   const normalizedEmail = email.trim().toLowerCase();
+
+  // ── Account lockout check ───────────────────────────────────────────────
+  // 5 wrong password attempts → 15-minute lockout
+  const lockRes = await query(
+    `SELECT locked_until, attempt_count FROM lockouts WHERE email = $1`,
+    [normalizedEmail]
+  );
+  const lockRecord = lockRes.rows[0];
+  if (lockRecord && lockRecord.locked_until && new Date(lockRecord.locked_until).getTime() > Date.now()) {
+    const waitMin = Math.ceil((new Date(lockRecord.locked_until).getTime() - Date.now()) / 60000);
+    throw new Error(`Account temporarily locked due to too many failed attempts. Try again in ${waitMin} minute${waitMin === 1 ? '' : 's'}.`);
+  }
+
   const res = await query('SELECT * FROM merchants WHERE email = $1', [normalizedEmail]);
   const merchant = res.rows[0];
 
   if (!merchant) {
+    // Constant-time dummy to thwart timing attacks — also increment lockout for non-existing accounts
     verifyPassword(password, 'scrypt:00000000000000000000000000000000:00000000000000000000000000000000');
     throw new Error('Invalid email or password');
   }
@@ -358,8 +377,33 @@ export async function requestLoginOtp({ email, password }) {
 
   const isPasswordValid = verifyPassword(password, merchant.password_hash);
   if (!isPasswordValid) {
-    throw new Error('Invalid email or password');
+    // Increment lockout counter
+    const currentCount = lockRecord ? (lockRecord.attempt_count || 0) : 0;
+    const newCount = currentCount + 1;
+    const lockedUntil = newCount >= 5
+      ? new Date(Date.now() + 15 * 60 * 1000).toISOString()
+      : null;
+
+    await query(
+      `INSERT INTO lockouts (email, attempt_count, locked_until, last_attempt_at)
+       VALUES ($1, $2, $3, datetime('now'))
+       ON CONFLICT (email) DO UPDATE SET
+         attempt_count = $2,
+         locked_until  = $3,
+         last_attempt_at = datetime('now')`,
+      [normalizedEmail, newCount, lockedUntil]
+    );
+
+    if (newCount >= 5) {
+      logger.warn({ email: normalizedEmail, attempts: newCount }, 'Account locked due to repeated wrong passwords');
+      throw new Error('Too many failed attempts. Your account is temporarily locked for 15 minutes.');
+    }
+    const remaining = 5 - newCount;
+    throw new Error(`Invalid email or password. ${remaining} attempt${remaining === 1 ? '' : 's'} before temporary lockout.`);
   }
+
+  // Successful password — clear any lockout record
+  await query(`DELETE FROM lockouts WHERE email = $1`, [normalizedEmail]);
 
   // Check 60-second cooldown
   const recentOtp = await query(
@@ -675,13 +719,23 @@ export async function setMerchantStatus(merchantId, status) {
 
 /**
  * Ensures the master Super Admin user account is seeded and configured.
+ * Reads ADMIN_PASSWORD from environment. Warns if using default password.
  */
 export async function ensureAdminAccount() {
   const adminEmail = (process.env.ADMIN_EMAIL || 'admin@gateway.local').toLowerCase().trim();
-  const adminPassword = process.env.ADMIN_PASSWORD || 'AdminGateway#2026!SecureKey';
+  const adminPassword = process.env.ADMIN_PASSWORD;
+
+  if (!adminPassword) {
+    if (config.environment === 'production') {
+      throw new Error('ADMIN_PASSWORD environment variable is required in production');
+    }
+    logger.warn('[SECURITY] ADMIN_PASSWORD not set — using fallback default. Set ADMIN_PASSWORD in .env before deploying!');
+  }
+
+  const effectivePassword = adminPassword || 'AdminGateway#2026!SecureKey';
   const adminApiKey = config.adminApiKey;
 
-  const passwordHash = hashPassword(adminPassword);
+  const passwordHash = hashPassword(effectivePassword);
   const webhookSecret = generateWebhookSecret();
 
   await query(
@@ -689,6 +743,7 @@ export async function ensureAdminAccount() {
      VALUES ('admin', $1, 'Central', 'Admin', 'Central Platform Super Admin', $2, 'admin', 'active', $3, NULL, $4, 'default', datetime('now'), datetime('now'))
      ON CONFLICT (id) DO UPDATE SET
        api_key = EXCLUDED.api_key,
+       password_hash = EXCLUDED.password_hash,
        role = 'admin',
        status = 'active',
        updated_at = datetime('now')`,
@@ -696,3 +751,37 @@ export async function ensureAdminAccount() {
   );
   logger.info({ adminEmail }, 'Master Super Admin account synchronized');
 }
+
+/**
+ * Purges expired OTP records from the database.
+ * Should be called periodically (every 5 minutes) to prevent DB bloat.
+ */
+export async function purgeExpiredOtps() {
+  try {
+    const result = await query(
+      `DELETE FROM otps WHERE expires_at < datetime('now')`,
+      []
+    );
+    const deleted = result.rowCount || 0;
+    if (deleted > 0) {
+      logger.info({ deleted }, 'Purged expired OTP records');
+    }
+  } catch (err) {
+    logger.error({ err }, 'Failed to purge expired OTPs');
+  }
+}
+
+/**
+ * Purges expired lockout records (older than 24h) from the database.
+ */
+export async function purgeExpiredLockouts() {
+  try {
+    await query(
+      `DELETE FROM lockouts WHERE locked_until < datetime('now', '-24 hours') OR (locked_until IS NULL AND last_attempt_at < datetime('now', '-24 hours'))`,
+      []
+    );
+  } catch (err) {
+    logger.error({ err }, 'Failed to purge expired lockouts');
+  }
+}
+

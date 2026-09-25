@@ -10,6 +10,7 @@ import {
   verifyLoginOtp,
 } from './auth.js';
 import { authRateLimit, authenticate, assertTrustedWebhookUrl } from './security.js';
+import { auditLog, getClientIp } from './audit.js';
 
 const router = express.Router();
 
@@ -57,12 +58,27 @@ router.post('/signup/verify-otp', authRateLimit({ windowMs: 60_000, max: 15 }), 
   try {
     const { email, otp } = otpVerifySchema.parse(req.body);
     const { user, token, message } = await verifySignupOtp({ email, otp });
-    res.status(201).json({
-      message,
-      token,
-      user,
+
+    // Audit: new merchant registered
+    await auditLog({
+      action: 'auth.signup',
+      actorId: user.id,
+      actorRole: 'merchant',
+      targetType: 'merchant',
+      targetId: user.id,
+      ip: getClientIp(req),
+      result: 'success',
+      details: { email: user.email, businessName: user.businessName },
     });
+
+    res.status(201).json({ message, token, user });
   } catch (err) {
+    await auditLog({
+      action: 'auth.signup',
+      ip: getClientIp(req),
+      result: 'failure',
+      details: { email: req.body?.email, error: err.message },
+    });
     res.status(400).json({ error: err.message });
   }
 });
@@ -74,6 +90,14 @@ router.post('/login/request-otp', authRateLimit({ windowMs: 60_000, max: 10 }), 
     const result = await requestLoginOtp({ email, password });
     res.json(result);
   } catch (err) {
+    // Audit failed login (wrong password / locked account)
+    const isLockout = err.message?.toLowerCase().includes('locked');
+    await auditLog({
+      action: isLockout ? 'auth.account_locked' : 'auth.login_failed',
+      ip: getClientIp(req),
+      result: 'failure',
+      details: { email: req.body?.email, reason: err.message },
+    });
     res.status(401).json({ error: err.message });
   }
 });
@@ -83,12 +107,27 @@ router.post('/login/verify-otp', authRateLimit({ windowMs: 60_000, max: 15 }), a
   try {
     const { email, otp } = otpVerifySchema.parse(req.body);
     const { user, token, message } = await verifyLoginOtp({ email, otp });
-    res.json({
-      message,
-      token,
-      user,
+
+    // Audit: successful login
+    await auditLog({
+      action: 'auth.login_success',
+      actorId: user.id,
+      actorRole: user.role,
+      targetType: 'merchant',
+      targetId: user.id,
+      ip: getClientIp(req),
+      result: 'success',
     });
+
+    res.json({ message, token, user });
   } catch (err) {
+    // Audit OTP failure
+    await auditLog({
+      action: 'auth.otp_invalid',
+      ip: getClientIp(req),
+      result: 'failure',
+      details: { email: req.body?.email, error: err.message },
+    });
     res.status(401).json({ error: err.message });
   }
 });
