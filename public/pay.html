@@ -132,11 +132,11 @@
 
       <!-- PAYMENT SUCCESS SCREEN (Shown automatically when on-chain payment is confirmed) -->
       <section class="card payment-success-card" id="payment-success-card" style="display: none; text-align: center; padding: 36px 24px; animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);">
-        <div style="width: 76px; height: 76px; margin: 0 auto 18px; border-radius: 50%; background: rgba(16, 185, 129, 0.15); border: 2px solid #10b981; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 32px rgba(16, 185, 129, 0.35);">
-          <span style="font-size: 2.6rem; color: #10b981; line-height: 1;">✓</span>
+        <div id="success-icon-wrap" style="width: 76px; height: 76px; margin: 0 auto 18px; border-radius: 50%; background: rgba(16, 185, 129, 0.15); border: 2px solid #10b981; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 32px rgba(16, 185, 129, 0.35); transition: all 0.3s ease;">
+          <span id="success-icon-symbol" style="font-size: 2.6rem; color: #10b981; line-height: 1;">✓</span>
         </div>
-        <h2 style="font-size: 1.65rem; font-weight: 800; color: #f8fafc; margin-bottom: 6px;">Payment Successful!</h2>
-        <p style="color: #94a3b8; font-size: 0.92rem; margin-bottom: 22px;">Your transaction has been confirmed on the blockchain.</p>
+        <h2 id="success-title" style="font-size: 1.65rem; font-weight: 800; color: #f8fafc; margin-bottom: 6px;">Payment Successful!</h2>
+        <p id="success-sub" style="color: #94a3b8; font-size: 0.92rem; margin-bottom: 22px;">Your transaction has been confirmed on the blockchain.</p>
 
         <div style="background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 18px 20px; text-align: left; margin-bottom: 22px; display: flex; flex-direction: column; gap: 11px;">
           <div style="display: flex; justify-content: space-between; align-items: center;">

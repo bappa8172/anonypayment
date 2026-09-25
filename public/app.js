@@ -154,20 +154,11 @@ function renderInvoice(invoice) {
   addressEl.textContent = invoice.address;
   copyAddressBtn.disabled = false;
 
-  if (invoice.status === 'confirmed') {
+  if (invoice.status === 'confirmed' || invoice.status === 'paid') {
     if (timerInterval) clearInterval(timerInterval);
-    if (pollInterval) clearInterval(pollInterval);
+    if (invoice.status === 'confirmed' && pollInterval) clearInterval(pollInterval);
     showPaymentSuccessScreen(invoice);
     return;
-  } else if (invoice.status === 'paid') {
-    statusIndicator.className = 'status-indicator paid';
-    const conf = invoice.confirmations || 1;
-    const req = invoice.confirmationsRequired || 12;
-    statusText.innerHTML = `<strong>⚡ Payment Detected!</strong> Confirming on BSC (${conf}/${req} Confirmations)`;
-    statusText.style.color = '#38bdf8';
-    timerValue.textContent = 'Confirming…';
-    timerValue.style.color = '#38bdf8';
-    if (timerInterval) clearInterval(timerInterval);
   } else if (invoice.status === 'expired') {
     statusIndicator.className = 'status-indicator expired';
     statusText.textContent = 'Invoice expired';
@@ -388,14 +379,49 @@ btnSaveEmail?.addEventListener('click', async () => {
   }
 });
 
-// Render Full Payment Success Card
+// Render Full Payment Confirm / Success Screen (Hides QR section completely)
 function showPaymentSuccessScreen(invoice) {
-  const checkoutCard = document.getElementById('checkout-card');
+  const pCard = document.getElementById('payment-card');
   const successCard = document.getElementById('payment-success-card');
   if (!successCard) return;
 
-  if (checkoutCard) checkoutCard.style.display = 'none';
+  // 1. COMPLETELY HIDE the payment card & QR code section
+  if (pCard) pCard.style.display = 'none';
+  const qrSection = document.getElementById('checkout-tab-qr-container');
+  if (qrSection) qrSection.style.display = 'none';
+  const qrBox = document.getElementById('qr-box');
+  if (qrBox) qrBox.style.display = 'none';
+
+  // 2. DISPLAY ONLY the Confirmation / Success Screen
   successCard.style.display = 'block';
+
+  const isConfirmed = invoice.status === 'confirmed';
+  const iconWrap = document.getElementById('success-icon-wrap');
+  const iconSymbol = document.getElementById('success-icon-symbol');
+  const titleEl = document.getElementById('success-title');
+  const subEl = document.getElementById('success-sub');
+
+  if (iconWrap && iconSymbol && titleEl && subEl) {
+    if (isConfirmed) {
+      iconWrap.style.borderColor = '#10b981';
+      iconWrap.style.background = 'rgba(16, 185, 129, 0.15)';
+      iconWrap.style.boxShadow = '0 0 32px rgba(16, 185, 129, 0.35)';
+      iconSymbol.textContent = '✓';
+      iconSymbol.style.color = '#10b981';
+      titleEl.textContent = 'Payment Confirmed!';
+      subEl.textContent = 'Your transaction has been confirmed on the blockchain.';
+    } else {
+      const conf = invoice.confirmations || 1;
+      const req = invoice.confirmationsRequired || 12;
+      iconWrap.style.borderColor = '#00f0ff';
+      iconWrap.style.background = 'rgba(0, 240, 255, 0.15)';
+      iconWrap.style.boxShadow = '0 0 32px rgba(0, 240, 255, 0.35)';
+      iconSymbol.textContent = '⚡';
+      iconSymbol.style.color = '#00f0ff';
+      titleEl.textContent = 'Payment Received!';
+      subEl.textContent = `Confirming on BNB Smart Chain (${conf}/${req} Confirmations)…`;
+    }
+  }
 
   const amountDisplay = `${invoice.amount} ${invoice.symbol || invoice.currency.split('_')[0]}`;
   const successAmount = document.getElementById('success-amount');
@@ -421,35 +447,38 @@ function showPaymentSuccessScreen(invoice) {
   const receiptNote = document.getElementById('success-receipt-note');
   if (receiptNote) {
     if (invoice.customerEmail) {
-      receiptNote.innerHTML = `<span>✉️</span> Official payment receipt sent to <strong>${invoice.customerEmail}</strong>`;
+      receiptNote.innerHTML = `<span>✉️</span> Official payment receipt ${isConfirmed ? 'dispatched' : 'will be sent'} to <strong>${invoice.customerEmail}</strong>`;
       receiptNote.style.display = 'flex';
     } else {
       receiptNote.style.display = 'none';
     }
   }
 
-  // Handle redirect if configured on payment link
-  const redirectUrl = invoice.redirectUrl || (invoice.metadata && invoice.metadata.redirectUrl);
-  if (redirectUrl) {
-    const redirectWrap = document.getElementById('success-redirect-wrap');
-    const redirectBtn = document.getElementById('btn-success-redirect');
-    const countdownEl = document.getElementById('success-countdown');
+  // Handle redirect if configured on payment link (only on confirmed finality)
+  if (isConfirmed) {
+    const redirectUrl = invoice.redirectUrl || (invoice.metadata && invoice.metadata.redirectUrl);
+    if (redirectUrl && !window._redirectCountdownActive) {
+      window._redirectCountdownActive = true;
+      const redirectWrap = document.getElementById('success-redirect-wrap');
+      const redirectBtn = document.getElementById('btn-success-redirect');
+      const countdownEl = document.getElementById('success-countdown');
 
-    if (redirectWrap) redirectWrap.style.display = 'block';
-    if (redirectBtn) {
-      redirectBtn.href = redirectUrl;
-      redirectBtn.style.display = 'block';
-    }
-
-    let secondsLeft = 5;
-    const redirectTimer = setInterval(() => {
-      secondsLeft -= 1;
-      if (countdownEl) countdownEl.textContent = secondsLeft;
-      if (secondsLeft <= 0) {
-        clearInterval(redirectTimer);
-        window.location.href = redirectUrl;
+      if (redirectWrap) redirectWrap.style.display = 'block';
+      if (redirectBtn) {
+        redirectBtn.href = redirectUrl;
+        redirectBtn.style.display = 'block';
       }
-    }, 1000);
+
+      let secondsLeft = 5;
+      const redirectTimer = setInterval(() => {
+        secondsLeft -= 1;
+        if (countdownEl) countdownEl.textContent = secondsLeft;
+        if (secondsLeft <= 0) {
+          clearInterval(redirectTimer);
+          window.location.href = redirectUrl;
+        }
+      }, 1000);
+    }
   }
 }
 
