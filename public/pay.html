@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#09111f">
+    <title>Payrail — Crypto Checkout</title>
+    <link rel="stylesheet" href="./styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <main class="shell" aria-live="polite">
+      <div class="brand">
+        <a href="/dashboard" class="brand-link">
+          <span class="mark">⚡</span> Payrail <span>Checkout</span>
+        </a>
+      </div>
+
+      <section class="card" id="payment-card">
+        <div class="card-header">
+          <p class="eyebrow">Crypto Invoice</p>
+          <span class="network-badge" id="network-badge">BSC Network</span>
+        </div>
+
+        <div id="order-meta-box" style="display: none; margin-bottom: 12px; padding: 10px 14px; background: rgba(255,255,255,0.04); border-radius: 10px; border-left: 3px solid #00f0ff;">
+          <div id="order-ref-badge" style="font-size: 0.78rem; font-weight: 700; color: #38bdf8;"></div>
+          <div id="order-desc" style="font-size: 0.85rem; color: #cbd5e1; margin-top: 2px;"></div>
+        </div>
+
+        <div class="amount-wrap">
+          <h1 id="amount">Loading…</h1>
+          <button class="copy-btn mini" id="copy-amount" title="Copy exact amount">Copy Amount</button>
+        </div>
+
+        <p class="network-desc" id="network-desc">Send exact crypto on the specified network</p>
+
+        <div class="qr-container">
+          <div class="qr-box" id="qr-box">
+            <img id="qr-image" alt="Crypto payment QR code" style="display: none;">
+            <div id="qr-loading" class="qr-skeleton">Generating QR…</div>
+          </div>
+          <p class="qr-hint">Scan with Binance, Trust Wallet, MetaMask, or any crypto wallet</p>
+        </div>
+
+        <div class="field-label">Deposit Address</div>
+        <div class="address-row">
+          <code id="address">—</code>
+          <button class="copy-btn" id="copy-address" disabled>Copy</button>
+        </div>
+
+        <div class="web3-actions">
+          <button class="web3-btn" id="pay-metamask" style="display: none;">
+            <span class="wallet-icon">🦊</span> Pay with MetaMask / Web3
+          </button>
+          <div id="web3-status" class="web3-note"></div>
+        </div>
+
+        <!-- Email Receipt Input for Payer -->
+        <div class="receipt-email-section" id="receipt-email-section" style="margin: 18px 0; padding: 14px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 12px;">
+          <div style="font-size: 0.8rem; font-weight: 600; color: #34d399; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+            <span>📧</span> Get Payment Receipt by Email
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <input type="email" id="customer-email-input" placeholder="Enter your email for official receipt" style="flex: 1; padding: 8px 12px; background: #08111e; border: 1px solid #1e293b; border-radius: 8px; color: #f8fafc; font-size: 0.85rem; outline: none;">
+            <button id="btn-save-email" style="padding: 8px 14px; background: #10b981; border: none; border-radius: 8px; color: white; font-weight: 600; font-size: 0.85rem; cursor: pointer;">Save</button>
+          </div>
+          <div id="email-status-msg" style="font-size: 0.75rem; margin-top: 6px; min-height: 16px;"></div>
+        </div>
+
+        <div class="status-box" id="status-box">
+          <div class="status-indicator" id="status-indicator"></div>
+          <span id="status-text">Checking invoice status…</span>
+        </div>
+
+        <div class="tx-link-row" id="tx-link-row" style="display: none;">
+          <span>On-Chain Tx: </span>
+          <a id="tx-link" href="#" target="_blank" rel="noopener noreferrer">View on Explorer ↗</a>
+        </div>
+
+        <div class="footer-timer">
+          <span id="timer-label">Expires in:</span>
+          <strong id="timer-value">—:—</strong>
+        </div>
+      </section>
+
+      <p class="disclaimer">
+        🔒 Real-time on-chain verification. Always double check network before sending.
+      </p>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

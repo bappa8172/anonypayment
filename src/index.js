@@ -116,7 +116,7 @@ app.use('/v1', publicRouter);
 // PAGE ENTRY POINTS
 // ============================================================
 app.get('/pay', (req, res) => {
-  res.sendFile(path.join(publicDir, 'index.html'));
+  res.sendFile(path.join(publicDir, 'pay.html'));
 });
 
 app.get('/dashboard', (req, res) => {
@@ -124,7 +124,7 @@ app.get('/dashboard', (req, res) => {
 });
 
 app.get('/', (req, res) => {
-  res.redirect('/dashboard');
+  res.sendFile(path.join(publicDir, 'index.html'));
 });
 
 // ============================================================

@@ -3,93 +3,468 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#09111f">
-    <title>Payrail — Crypto Checkout</title>
-    <link rel="stylesheet" href="./styles.css">
+    <meta name="theme-color" content="#070d18">
+    <title>Payrail — High-Security Crypto Payment Gateway & Wallet</title>
+    <meta name="description" content="Non-custodial, high-security crypto payment gateway for businesses. Zero chargebacks, automated invoicing, 2FA OTP verification, and instant BSC settlement.">
+    <link rel="stylesheet" href="./landing.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
   </head>
   <body>
-    <main class="shell" aria-live="polite">
-      <div class="brand">
-        <a href="/dashboard" class="brand-link">
-          <span class="mark">⚡</span> Payrail <span>Checkout</span>
+
+    <!-- Sticky Navigation -->
+    <header class="navbar">
+      <div class="container nav-wrap">
+        <a href="/" class="brand-logo">
+          <span style="font-size: 1.5rem;">⚡</span>
+          <span>PAYRAIL <span class="brand-badge">GATEWAY</span></span>
         </a>
+
+        <nav class="nav-links">
+          <a href="#benefits" class="nav-link">Benefits</a>
+          <a href="#security" class="nav-link">Safety & Protection</a>
+          <a href="#solutions" class="nav-link">What It Helps</a>
+          <a href="#how-it-works" class="nav-link">How It Works</a>
+        </nav>
+
+        <div class="nav-actions">
+          <a href="#auth-section" class="btn btn-ghost btn-sm" id="nav-btn-auth" onclick="switchTab('login')">Sign In</a>
+          <a href="#auth-section" class="btn btn-primary btn-sm" onclick="switchTab('signup')">Create Account</a>
+        </div>
       </div>
+    </header>
 
-      <section class="card" id="payment-card">
-        <div class="card-header">
-          <p class="eyebrow">Crypto Invoice</p>
-          <span class="network-badge" id="network-badge">BSC Network</span>
-        </div>
+    <!-- Main Content -->
+    <main>
 
-        <div id="order-meta-box" style="display: none; margin-bottom: 12px; padding: 10px 14px; background: rgba(255,255,255,0.04); border-radius: 10px; border-left: 3px solid #00f0ff;">
-          <div id="order-ref-badge" style="font-size: 0.78rem; font-weight: 700; color: #38bdf8;"></div>
-          <div id="order-desc" style="font-size: 0.85rem; color: #cbd5e1; margin-top: 2px;"></div>
-        </div>
+      <!-- Hero Section -->
+      <section class="hero" id="hero">
+        <div class="container">
 
-        <div class="amount-wrap">
-          <h1 id="amount">Loading…</h1>
-          <button class="copy-btn mini" id="copy-amount" title="Copy exact amount">Copy Amount</button>
-        </div>
-
-        <p class="network-desc" id="network-desc">Send exact crypto on the specified network</p>
-
-        <div class="qr-container">
-          <div class="qr-box" id="qr-box">
-            <img id="qr-image" alt="Crypto payment QR code" style="display: none;">
-            <div id="qr-loading" class="qr-skeleton">Generating QR…</div>
+          <!-- Logged In Quick Banner -->
+          <div id="logged-in-banner">
+            <div>
+              <strong>👋 Welcome back, <span id="banner-user-name">Merchant</span>!</strong>
+              <span style="color: var(--text-muted); margin-left: 8px;">Your session is authenticated and active.</span>
+            </div>
+            <a href="/dashboard" class="btn btn-emerald btn-sm">Enter Merchant Dashboard →</a>
           </div>
-          <p class="qr-hint">Scan with Binance, Trust Wallet, MetaMask, or any crypto wallet</p>
-        </div>
 
-        <div class="field-label">Deposit Address</div>
-        <div class="address-row">
-          <code id="address">—</code>
-          <button class="copy-btn" id="copy-address" disabled>Copy</button>
-        </div>
+          <div class="hero-grid">
 
-        <div class="web3-actions">
-          <button class="web3-btn" id="pay-metamask" style="display: none;">
-            <span class="wallet-icon">🦊</span> Pay with MetaMask / Web3
-          </button>
-          <div id="web3-status" class="web3-note"></div>
-        </div>
+            <!-- Hero Left: Pitch & Value Proposition -->
+            <div class="hero-content">
+              <div class="pill-badge">
+                <span>🛡️</span> Military-Grade Security • BSC Mainnet • Zero KYC Friction
+              </div>
 
-        <!-- Email Receipt Input for Payer -->
-        <div class="receipt-email-section" id="receipt-email-section" style="margin: 18px 0; padding: 14px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 12px;">
-          <div style="font-size: 0.8rem; font-weight: 600; color: #34d399; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-            <span>📧</span> Get Payment Receipt by Email
+              <h1 class="hero-title">
+                The High-Security <span>Crypto Gateway</span> Built for Real Business
+              </h1>
+
+              <p class="hero-subtitle">
+                Accept crypto payments directly to your isolated non-custodial wallet with zero chargebacks, automated customer invoicing, instant email receipts, and military-grade OTP security. No paperwork required to start.
+              </p>
+
+              <div class="hero-metrics">
+                <div class="metric-item">
+                  <div class="metric-num">0%</div>
+                  <div class="metric-lbl">Chargeback Fraud</div>
+                </div>
+                <div class="metric-item">
+                  <div class="metric-num">12</div>
+                  <div class="metric-lbl">BSC Confirmations</div>
+                </div>
+                <div class="metric-item">
+                  <div class="metric-num">100%</div>
+                  <div class="metric-lbl">Isolated Wallets</div>
+                </div>
+                <div class="metric-item">
+                  <div class="metric-num">60s</div>
+                  <div class="metric-lbl">Instant Setup</div>
+                </div>
+              </div>
+
+              <div style="display: flex; gap: 14px; margin-top: 12px; flex-wrap: wrap;">
+                <a href="#auth-section" class="btn btn-primary" id="hero-cta-btn" onclick="switchTab('signup')">
+                  Start Accepting Crypto Free →
+                </a>
+                <a href="#security" class="btn btn-ghost">
+                  Explore Security Specs
+                </a>
+              </div>
+            </div>
+
+            <!-- Hero Right: Interactive 2-Step Auth Card -->
+            <div class="auth-card" id="auth-section">
+
+              <div class="auth-tabs">
+                <button type="button" class="tab-btn active" data-tab="signup">Create Business Account</button>
+                <button type="button" class="tab-btn" data-tab="login">Sign In</button>
+              </div>
+
+              <!-- SIGNUP CONTAINER -->
+              <div id="container-signup">
+                <div id="alert-signup" class="alert-box alert-danger"></div>
+
+                <!-- Step 1: Merchant Details Form -->
+                <form id="form-signup-step1">
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label class="form-label">First Name</label>
+                      <input type="text" id="reg-firstname" class="form-input" placeholder="e.g. Satoshi" required>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Last Name</label>
+                      <input type="text" id="reg-lastname" class="form-input" placeholder="e.g. Nakamoto" required>
+                    </div>
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label">Business / Store Name</label>
+                    <input type="text" id="reg-businessname" class="form-input" placeholder="e.g. Apex Global Mart" required>
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label">Business Email</label>
+                    <input type="email" id="reg-email" class="form-input" placeholder="name@yourbusiness.com" required>
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label">Password (min 8 characters)</label>
+                    <input type="password" id="reg-password" class="form-input" placeholder="••••••••••••" minlength="8" required>
+                  </div>
+
+                  <button type="submit" id="btn-submit-signup" class="btn btn-primary btn-block" style="margin-top: 6px;">
+                    Send 6-Digit Email Code →
+                  </button>
+
+                  <div class="security-footer-note">
+                    <span>🔒</span> Passwords protected with high-work-factor scrypt hashing
+                  </div>
+                </form>
+
+                <!-- Step 2: Signup 6-digit OTP Form -->
+                <form id="form-signup-step2" style="display: none;">
+                  <div class="otp-box">
+                    <div style="font-weight: 700; color: var(--accent-cyan); font-size: 0.95rem;">Enter 6-Digit Verification Code</div>
+                    <p style="font-size: 0.82rem; color: var(--text-muted); margin-top: 4px;">
+                      We sent a secure one-time code to <strong id="otp-signup-email-preview" style="color: #fff;"></strong>
+                    </p>
+
+                    <input type="text" id="reg-otp-code" class="otp-input-field" maxlength="6" inputmode="numeric" placeholder="123456" autocomplete="one-time-code" required>
+                  </div>
+
+                  <button type="submit" id="btn-verify-signup" class="btn btn-emerald btn-block">
+                    Verify Code & Enter Dashboard →
+                  </button>
+
+                  <div class="resend-row">
+                    <button type="button" class="link-btn" id="btn-back-signup">← Change Email</button>
+                    <button type="button" class="link-btn" id="btn-resend-signup-otp">Resend Code</button>
+                  </div>
+                </form>
+              </div>
+
+              <!-- LOGIN CONTAINER -->
+              <div id="container-login" style="display: none;">
+                <div id="alert-login" class="alert-box alert-danger"></div>
+
+                <!-- Step 1: Login Credentials Form -->
+                <form id="form-login-step1">
+                  <div class="form-group">
+                    <label class="form-label">Registered Business Email</label>
+                    <input type="email" id="login-email" class="form-input" placeholder="name@yourbusiness.com" required>
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <input type="password" id="login-password" class="form-input" placeholder="••••••••••••" required>
+                  </div>
+
+                  <button type="submit" id="btn-submit-login" class="btn btn-primary btn-block" style="margin-top: 6px;">
+                    Continue with 2FA OTP →
+                  </button>
+
+                  <div class="security-footer-note">
+                    <span>🛡️</span> Protected by 15-minute brute-force account lockout
+                  </div>
+                </form>
+
+                <!-- Step 2: Login 6-digit 2FA OTP Form -->
+                <form id="form-login-step2" style="display: none;">
+                  <div class="otp-box">
+                    <div style="font-weight: 700; color: var(--accent-cyan); font-size: 0.95rem;">Enter 2FA Security Code</div>
+                    <p style="font-size: 0.82rem; color: var(--text-muted); margin-top: 4px;">
+                      Dispatched to <strong id="otp-login-email-preview" style="color: #fff;"></strong>
+                    </p>
+
+                    <input type="text" id="login-otp-code" class="otp-input-field" maxlength="6" inputmode="numeric" placeholder="123456" autocomplete="one-time-code" required>
+                  </div>
+
+                  <button type="submit" id="btn-verify-login" class="btn btn-emerald btn-block">
+                    Verify & Access Dashboard →
+                  </button>
+
+                  <div class="resend-row">
+                    <button type="button" class="link-btn" id="btn-back-login">← Change Credentials</button>
+                    <button type="button" class="link-btn" id="btn-resend-login-otp">Resend Code</button>
+                  </div>
+                </form>
+              </div>
+
+            </div>
+
           </div>
-          <div style="display: flex; gap: 8px;">
-            <input type="email" id="customer-email-input" placeholder="Enter your email for official receipt" style="flex: 1; padding: 8px 12px; background: #08111e; border: 1px solid #1e293b; border-radius: 8px; color: #f8fafc; font-size: 0.85rem; outline: none;">
-            <button id="btn-save-email" style="padding: 8px 14px; background: #10b981; border: none; border-radius: 8px; color: white; font-weight: 600; font-size: 0.85rem; cursor: pointer;">Save</button>
-          </div>
-          <div id="email-status-msg" style="font-size: 0.75rem; margin-top: 6px; min-height: 16px;"></div>
-        </div>
-
-        <div class="status-box" id="status-box">
-          <div class="status-indicator" id="status-indicator"></div>
-          <span id="status-text">Checking invoice status…</span>
-        </div>
-
-        <div class="tx-link-row" id="tx-link-row" style="display: none;">
-          <span>On-Chain Tx: </span>
-          <a id="tx-link" href="#" target="_blank" rel="noopener noreferrer">View on Explorer ↗</a>
-        </div>
-
-        <div class="footer-timer">
-          <span id="timer-label">Expires in:</span>
-          <strong id="timer-value">—:—</strong>
         </div>
       </section>
 
-      <p class="disclaimer">
-        🔒 Real-time on-chain verification. Always double check network before sending.
-      </p>
+      <!-- Section: Safety & Manipulation Protection -->
+      <section class="section section-alt" id="security">
+        <div class="container">
+          <div class="section-header">
+            <div class="section-tag">Security Architecture</div>
+            <h2 class="section-title">Built So No One Can Hack or Manipulate Your Funds</h2>
+            <p class="section-desc">
+              Every transaction, balance update, and authentication step is mathematically verified, isolated, and permanently recorded.
+            </p>
+          </div>
+
+          <div class="cards-grid">
+            <div class="feature-card">
+              <div class="feature-icon">🔐</div>
+              <h3 class="feature-title">BIP-44 HD Wallet Isolation</h3>
+              <p class="feature-text">
+                Every merchant account is assigned a mathematically isolated hierarchical deterministic derivation path. Funds are never pooled, mixed, or co-mingled. Anti-IDOR enforcement guarantees no merchant can ever access another account's balance or invoices.
+              </p>
+            </div>
+
+            <div class="feature-card">
+              <div class="feature-icon emerald">✉️</div>
+              <h3 class="feature-title">Hostinger SMTP 2FA OTP</h3>
+              <p class="feature-text">
+                Every registration and sign-in requires cryptographically random 6-digit codes dispatched via SSL-encrypted SMTP. OTPs are hashed using HMAC-SHA256 and verified using constant-time buffers (<code>timingSafeEqual</code>) to prevent timing-attack snooping.
+              </p>
+            </div>
+
+            <div class="feature-card">
+              <div class="feature-icon amber">🛡️</div>
+              <h3 class="feature-title">Anti-Brute-Force & Lockout</h3>
+              <p class="feature-text">
+                Passwords are protected using the memory-hard <code>scrypt</code> key derivation function (N=16384). Five failed password attempts trigger an immediate, automated 15-minute account lockout, combined with per-IP rate limiters to defeat credential stuffing.
+              </p>
+            </div>
+
+            <div class="feature-card">
+              <div class="feature-icon">⛓️</div>
+              <h3 class="feature-title">12 BSC Mainnet Confirmations</h3>
+              <p class="feature-text">
+                Continuous on-chain monitoring on Binance Smart Chain strictly requires 12 confirmations before marking any payment as confirmed and crediting your balance. This eliminates the risk of double-spend attacks and chain reorganizations.
+              </p>
+            </div>
+
+            <div class="feature-card">
+              <div class="feature-icon emerald">📋</div>
+              <h3 class="feature-title">Tamper-Proof Audit Logging</h3>
+              <p class="feature-text">
+                All security events — logins, failed passwords, account lockouts, invoice dispatches, status changes, and treasury payouts — are written directly to an indexed, append-only <code>audit_logs</code> database table with requester IP and timestamps.
+              </p>
+            </div>
+
+            <div class="feature-card">
+              <div class="feature-icon amber">🌐</div>
+              <h3 class="feature-title">Replay & SSRF Webhook Shield</h3>
+              <p class="feature-text">
+                All outgoing webhooks are signed with your individual merchant secret using timestamped HMAC-SHA256 headers. Furthermore, strict SSRF filters prevent webhooks from ever pinging private or internal network addresses.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section: Benefits for Businesses -->
+      <section class="section" id="benefits">
+        <div class="container">
+          <div class="section-header">
+            <div class="section-tag">Merchant Advantages</div>
+            <h2 class="section-title">Why Modern Businesses Choose Payrail</h2>
+            <p class="section-desc">
+              Traditional payment gateways take 3-5% in fees, freeze accounts arbitrarily, and leave you vulnerable to chargebacks. Payrail gives you total financial control.
+            </p>
+          </div>
+
+          <div class="cards-grid">
+            <div class="feature-card">
+              <div class="feature-icon emerald">🚫</div>
+              <h3 class="feature-title">0% Chargeback Risk</h3>
+              <p class="feature-text">
+                Blockchain transactions are permanent and mathematically irreversible. Say goodbye to fraudulent customer chargebacks, bank disputes, and expensive merchant arbitration penalties.
+              </p>
+            </div>
+
+            <div class="feature-card">
+              <div class="feature-icon">⚡</div>
+              <h3 class="feature-title">Zero KYC Bureaucracy</h3>
+              <p class="feature-text">
+                Start accepting crypto immediately. No identity scans, no utility bill uploads, and no waiting weeks for underwriting approval. Simply register your business with an email and start collecting.
+              </p>
+            </div>
+
+            <div class="feature-card">
+              <div class="feature-icon amber">📧</div>
+              <h3 class="feature-title">Automated Email Receipts</h3>
+              <p class="feature-text">
+                Customers receive an official, beautifully formatted HTML payment receipt the exact millisecond their transaction is confirmed on-chain. You receive an instant payment confirmation alert.
+              </p>
+            </div>
+
+            <div class="feature-card">
+              <div class="feature-icon">💰</div>
+              <h3 class="feature-title">Multi-Currency Invoicing</h3>
+              <p class="feature-text">
+                Create dynamic crypto invoices denominated in BNB or USDT. Every invoice derives a single-use deposit address with auto-generated QR codes compatible with Trust Wallet, Binance, and MetaMask.
+              </p>
+            </div>
+
+            <div class="feature-card">
+              <div class="feature-icon emerald">🔄</div>
+              <h3 class="feature-title">0-Gas Internal Transfers</h3>
+              <p class="feature-text">
+                Need to settle funds between multiple branches, partners, or internal merchant wallets? Payrail provides instant internal ledger settlements with zero gas fees and zero block delay.
+              </p>
+            </div>
+
+            <div class="feature-card">
+              <div class="feature-icon amber">🔌</div>
+              <h3 class="feature-title">Developer-Ready REST API</h3>
+              <p class="feature-text">
+                Integrate into any custom e-commerce checkout, mobile app, or backend in under 10 minutes using your secret merchant API key (<code>mch_live_...</code>) and standardized JSON endpoints.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section: What It Helps (Solutions) -->
+      <section class="section section-alt" id="solutions">
+        <div class="container">
+          <div class="section-header">
+            <div class="section-tag">Use Cases & Solutions</div>
+            <h2 class="section-title">What Payrail Helps You Accomplish</h2>
+            <p class="section-desc">
+              Whether you are running an online store, a SaaS platform, a digital agency, or cross-border trade, Payrail adapts to your workflow.
+            </p>
+          </div>
+
+          <div class="cards-grid">
+            <div class="feature-card">
+              <div class="feature-icon">🛍️</div>
+              <h3 class="feature-title">E-Commerce & Online Stores</h3>
+              <p class="feature-text">
+                Embed direct crypto checkouts on your product pages. Customers choose BNB or USDT, scan the QR code with their mobile wallet, and the order is marked paid automatically via webhook.
+              </p>
+            </div>
+
+            <div class="feature-card">
+              <div class="feature-icon emerald">💻</div>
+              <h3 class="feature-title">SaaS & Digital Subscriptions</h3>
+              <p class="feature-text">
+                Bill global users for subscriptions, software licenses, or digital downloads without geographic payment restrictions, credit card declination, or currency conversion hurdles.
+              </p>
+            </div>
+
+            <div class="feature-card">
+              <div class="feature-icon amber">🌍</div>
+              <h3 class="feature-title">Cross-Border & B2B Invoicing</h3>
+              <p class="feature-text">
+                Send professional crypto invoices to international clients. Funds arrive in minutes instead of 3–5 business days via SWIFT wire transfers, saving thousands in international banking fees.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section: How It Works -->
+      <section class="section" id="how-it-works">
+        <div class="container">
+          <div class="section-header">
+            <div class="section-tag">Simple 3-Step Process</div>
+            <h2 class="section-title">How To Get Started in 60 Seconds</h2>
+            <p class="section-desc">
+              You are three quick steps away from accepting crypto payments worldwide.
+            </p>
+          </div>
+
+          <div class="steps-grid">
+            <div class="step-card">
+              <div class="step-num">01</div>
+              <h3 class="step-title">Register & Verify</h3>
+              <p class="step-desc">
+                Enter your business name and email above. Enter the 6-digit OTP code sent to your inbox. Your isolated crypto wallet and live API keys are provisioned instantly.
+              </p>
+            </div>
+
+            <div class="step-card">
+              <div class="step-num">02</div>
+              <h3 class="step-title">Generate Invoice or API Call</h3>
+              <p class="step-desc">
+                Create an invoice directly from your merchant dashboard or make a simple <code>POST /v1/merchant/invoices</code> API call from your website backend.
+              </p>
+            </div>
+
+            <div class="step-card">
+              <div class="step-num">03</div>
+              <h3 class="step-title">Receive Funds & Auto Receipts</h3>
+              <p class="step-desc">
+                Your customer scans the checkout QR code with Binance, Trust Wallet, or MetaMask. When 12 blocks confirm on BSC, your balance is credited and an official receipt is emailed.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Bottom CTA Banner -->
+      <section class="section">
+        <div class="container">
+          <div class="cta-banner">
+            <h2 class="cta-title">Ready to Take Control of Your Payments?</h2>
+            <p class="cta-subtitle">
+              Join merchants processing seamless on-chain crypto transactions with zero chargebacks and military-grade isolation.
+            </p>
+            <a href="#auth-section" class="btn btn-primary" onclick="switchTab('signup')">
+              Create Your Merchant Account Free →
+            </a>
+          </div>
+        </div>
+      </section>
+
     </main>
 
-    <script src="./app.js"></script>
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="container footer-wrap">
+        <div>
+          <div style="font-weight: 800; color: #fff; font-size: 1.1rem; margin-bottom: 4px;">
+            ⚡ PAYRAIL GATEWAY
+          </div>
+          <div>High-Security Crypto Payment Gateway & HD Wallet Infrastructure</div>
+        </div>
+
+        <div class="footer-links">
+          <a href="#benefits">Benefits</a>
+          <a href="#security">Security Specs</a>
+          <a href="#solutions">Solutions</a>
+          <a href="/dashboard">Merchant Dashboard</a>
+          <a href="/health" target="_blank">Network Status</a>
+        </div>
+      </div>
+      <div class="container" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.04); font-size: 0.78rem; text-align: center; color: var(--text-sub);">
+        © 2026 Payrail Gateway. All rights reserved. BSC Mainnet Chain ID: 56. Protected by scrypt & HMAC-SHA256.
+      </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="./landing.js"></script>
   </body>
 </html>

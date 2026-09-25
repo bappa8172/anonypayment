@@ -5,8 +5,6 @@ function getAuthHeaders() {
   const h = { 'Content-Type': 'application/json' };
   if (authToken) {
     h['Authorization'] = `Bearer ${authToken}`;
-  } else {
-    h['X-API-Key'] = 'gateway_admin_secret_key_prod_test_32chars';
   }
   return h;
 }
@@ -970,6 +968,12 @@ function startCooldownTimer(buttonEl, secEl, cooldownSec) {
 }
 
 async function checkAuth() {
+  if (!authToken) {
+    currentUser = null;
+    window.location.href = '/?auth=login';
+    return false;
+  }
+
   try {
     const res = await fetch('/auth/me', { headers });
     if (res.ok) {
@@ -983,11 +987,11 @@ async function checkAuth() {
     console.warn('Auth check error:', err);
   }
 
-  // Not authenticated
+  // Not authenticated or token invalid
   currentUser = null;
-  document.getElementById('user-profile-badge').style.display = 'none';
-  document.getElementById('btn-open-auth-modal').style.display = 'inline-block';
-  openModal('modal-auth');
+  authToken = '';
+  localStorage.removeItem('payrail_token');
+  window.location.href = '/?auth=login';
   return false;
 }
 
@@ -1346,7 +1350,7 @@ document.getElementById('btn-logout')?.addEventListener('click', () => {
   authToken = '';
   localStorage.removeItem('payrail_token');
   currentUser = null;
-  checkAuth();
+  window.location.href = '/?auth=logout';
 });
 
 document.getElementById('btn-open-auth-modal')?.addEventListener('click', () => {
