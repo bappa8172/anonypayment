@@ -930,11 +930,6 @@ app.post('/api/crypto-webhook', express.raw({ type: 'application/json' }), (req,
           </div>
           <div id="login-status" class="alert-box" style="display: none;"></div>
           <button type="submit" class="btn btn-primary" id="btn-submit-login" style="padding: 12px; font-weight: 700;">Continue with Security Code →</button>
-
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; font-size: 0.8rem; color: var(--text-muted);">
-            <span>Platform Administrator?</span>
-            <button type="button" class="btn-text" id="btn-quick-admin-login" style="color: var(--accent-cyan);">Quick Admin Login →</button>
-          </div>
         </form>
 
         <!-- Step 2: Login 2FA OTP Verification -->
@@ -1041,11 +1036,14 @@ app.post('/api/crypto-webhook', express.raw({ type: 'application/json' }), (req,
         </div>
 
         <div class="form-group">
-          <label>Master 12-Word Recovery Phrase (BIP-39 Mnemonic)</label>
-          <div style="background: rgba(0,0,0,0.4); border: 1px solid var(--border); padding: 14px; border-radius: 10px; font-family: 'JetBrains Mono', monospace; font-size: 0.95rem; color: #00f0ff; line-height: 1.6;" id="backup-mnemonic-text">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <label style="margin: 0;">Master 12-Word Recovery Phrase (BIP-39 Mnemonic)</label>
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-toggle-seed-phrase" style="padding: 4px 10px; font-size: 0.78rem;">👁️ Reveal Seed Phrase</button>
+          </div>
+          <div style="background: rgba(0,0,0,0.5); border: 1px solid var(--border); padding: 14px; border-radius: 10px; font-family: 'JetBrains Mono', monospace; font-size: 0.95rem; color: #00f0ff; line-height: 1.6; filter: blur(8px); user-select: none; transition: filter 0.3s ease; position: relative;" id="backup-mnemonic-text">
             Loading…
           </div>
-          <p class="form-hint" style="font-size: 0.8rem; color: var(--text-muted); margin-top: 6px;">You can import this phrase into Trust Wallet or MetaMask using <em>"Add Wallet" → "I already have a wallet" → "Secret Recovery Phrase"</em>.</p>
+          <p class="form-hint" style="font-size: 0.8rem; color: var(--text-muted); margin-top: 6px;">Protected by anti-shoulder-surfing shield. Click Reveal only when in a private environment.</p>
         </div>
 
         <div class="form-group">

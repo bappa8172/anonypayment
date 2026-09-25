@@ -13,6 +13,13 @@
   </head>
   <body>
 
+    <!-- Ambient Glowing Background Orbs -->
+    <div class="ambient-glow-wrap">
+      <div class="ambient-orb orb-1"></div>
+      <div class="ambient-orb orb-2"></div>
+      <div class="ambient-orb orb-3"></div>
+    </div>
+
     <!-- Sticky Navigation -->
     <header class="navbar">
       <div class="container nav-wrap">
@@ -110,17 +117,24 @@
               </div>
 
               <!-- Terminal Preview Box -->
-              <div style="background: rgba(7, 13, 24, 0.9); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: var(--radius-md); padding: 18px; margin-bottom: 20px; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;">
+              <div style="background: rgba(5, 10, 20, 0.95); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: var(--radius-md); padding: 20px; margin-bottom: 22px; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; box-shadow: inset 0 2px 10px rgba(0,0,0,0.5);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 0.76rem; color: var(--text-sub);">
+                  <span>STATUS: LIVE ENGINE</span>
+                  <span style="display: flex; align-items: center; gap: 6px;">
+                    <span class="pulse-dot"></span>
+                    <span style="color: var(--accent-emerald);">P2P SYNCED</span>
+                  </span>
+                </div>
                 <div style="color: var(--text-muted); margin-bottom: 8px;">
                   <span style="color: var(--accent-cyan);">$</span> payrail.verifySecurityEngine()
                 </div>
-                <div style="color: #6ee7b7; margin-bottom: 4px;">✔ BIP-44 HD Wallet Isolation: ACTIVE</div>
-                <div style="color: #6ee7b7; margin-bottom: 4px;">✔ Hostinger SMTP 2FA OTP: ACTIVE</div>
-                <div style="color: #6ee7b7; margin-bottom: 4px;">✔ 15-Minute Account Lockout: ARMED</div>
-                <div style="color: #6ee7b7; margin-bottom: 4px;">✔ BSC Finality Guard: 12 BLOCKS</div>
-                <div style="color: #6ee7b7; margin-bottom: 8px;">✔ Append-Only Audit Logging: VERIFIED</div>
-                <div style="color: var(--accent-blue); padding-top: 6px; border-top: 1px dashed rgba(255,255,255,0.1);">
-                  &gt; Settlement: 0% Chargebacks | 0 Gas Internal
+                <div style="color: #6ee7b7; margin-bottom: 4px;">✔ BIP-44 HD Derivation: <span style="color: #fff;">100% ISOLATED</span></div>
+                <div style="color: #6ee7b7; margin-bottom: 4px;">✔ 2FA Hostinger SMTP OTP: <span style="color: #fff;">ENABLED</span></div>
+                <div style="color: #6ee7b7; margin-bottom: 4px;">✔ 15-Min Brute-Force Lockout: <span style="color: #fff;">ACTIVE</span></div>
+                <div style="color: #6ee7b7; margin-bottom: 4px;">✔ BSC Finality Guard: <span style="color: #fff;">12 CONFIRMATIONS</span></div>
+                <div style="color: #6ee7b7; margin-bottom: 12px;">✔ Immutable Audit Ledger: <span style="color: #fff;">tamper_proof</span></div>
+                <div style="background: rgba(0, 240, 255, 0.08); border: 1px solid rgba(0, 240, 255, 0.25); border-radius: 6px; padding: 10px 12px; color: var(--accent-cyan); font-size: 0.8rem;">
+                  ⚡ Real-Time Settlement: <strong>0% Chargebacks</strong> • <strong>0 Gas Internal</strong>
                 </div>
               </div>
 
@@ -267,6 +281,58 @@
               </p>
             </div>
           </div>
+
+          <!-- Interactive Savings Calculator Widget -->
+          <div style="margin-top: 48px; background: rgba(5, 10, 20, 0.85); border: 1px solid rgba(0, 240, 255, 0.3); border-radius: var(--radius-lg); padding: 36px; backdrop-filter: blur(20px); box-shadow: 0 16px 40px rgba(0,0,0,0.5);">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 36px; align-items: center;">
+              <div>
+                <span class="pill-badge" style="font-size: 0.75rem; margin-bottom: 12px;">Interactive Savings Calculator</span>
+                <h3 style="font-size: 1.8rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 10px;">
+                  See How Much Your Business Saves
+                </h3>
+                <p style="font-size: 0.95rem; color: var(--text-muted); line-height: 1.6; margin-bottom: 20px;">
+                  Credit card processors silently take 2.9% to 4% + $0.30 on every single charge, plus hit you with $15–$50 dispute fees on fraudulent chargebacks. With crypto on Payrail, every transaction is mathematically irreversible.
+                </p>
+
+                <div style="margin-bottom: 12px;">
+                  <div style="display: flex; justify-content: space-between; font-size: 0.9rem; font-weight: 700; margin-bottom: 8px;">
+                    <span>Monthly Sales Volume:</span>
+                    <span id="calc-volume-display" style="color: var(--accent-cyan); font-size: 1.1rem;">$25,000 / mo</span>
+                  </div>
+                  <input type="range" id="calc-range" min="1000" max="100000" step="1000" value="25000" style="width: 100%; accent-color: var(--accent-cyan); cursor: pointer; height: 8px; border-radius: 4px;">
+                  <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-sub); margin-top: 4px;">
+                    <span>$1,000</span>
+                    <span>$50,000</span>
+                    <span>$100,000+</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Comparison Output Cards -->
+              <div style="display: flex; flex-direction: column; gap: 14px;">
+                <div style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: var(--radius-md); padding: 18px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                    <span style="font-weight: 700; color: #fca5a5; font-size: 0.9rem;">Traditional Processors (Stripe/PayPal)</span>
+                    <span id="calc-traditional-fees" style="font-size: 1.25rem; font-weight: 800; color: #f87171;">-$875.00 / mo</span>
+                  </div>
+                  <div style="font-size: 0.8rem; color: var(--text-muted);">
+                    ⚠️ Subject to 90-day customer chargeback fraud, rolling reserve holds, and unexpected account freezes.
+                  </div>
+                </div>
+
+                <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.4); border-radius: var(--radius-md); padding: 18px; box-shadow: 0 4px 20px rgba(16, 185, 129, 0.15);">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                    <span style="font-weight: 700; color: #6ee7b7; font-size: 0.9rem;">Payrail Crypto Gateway</span>
+                    <span id="calc-savings-display" style="font-size: 1.35rem; font-weight: 800; color: #10b981;">+$875 Saved</span>
+                  </div>
+                  <div style="font-size: 0.8rem; color: var(--text-muted);">
+                    ✔ <strong>0% Chargebacks</strong> • <strong>100% Non-Custodial HD Isolation</strong> • <strong>Instant Settlement</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
         </div>
       </section>
 

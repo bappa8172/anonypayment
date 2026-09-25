@@ -60,6 +60,28 @@ document.querySelectorAll('a[href^="#"]').forEach(anchor => {
   });
 });
 
+// Interactive Savings Calculator
+function initCalculator() {
+  const range = document.getElementById('calc-range');
+  const volumeDisplay = document.getElementById('calc-volume-display');
+  const traditionalFees = document.getElementById('calc-traditional-fees');
+  const savingsDisplay = document.getElementById('calc-savings-display');
+
+  if (!range || !volumeDisplay) return;
+
+  function update() {
+    const val = parseInt(range.value, 10);
+    const traditional = val * 0.035; // 3.5%
+    volumeDisplay.textContent = `$${val.toLocaleString()} / mo`;
+    traditionalFees.textContent = `-$${traditional.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / mo`;
+    savingsDisplay.textContent = `+$${traditional.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Saved`;
+  }
+
+  range.addEventListener('input', update);
+  update();
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   checkExistingSession();
+  initCalculator();
 });

@@ -386,6 +386,27 @@ document.getElementById('btn-switch-account')?.addEventListener('click', () => {
   document.getElementById('card-already-logged').style.display = 'none';
 });
 
+// Password Visibility Toggles
+function setupPasswordToggle(btnId, inputId) {
+  const btn = document.getElementById(btnId);
+  const input = document.getElementById(inputId);
+  if (!btn || !input) return;
+
+  btn.addEventListener('click', () => {
+    if (input.type === 'password') {
+      input.type = 'text';
+      btn.textContent = '🙈';
+    } else {
+      input.type = 'password';
+      btn.textContent = '👁️';
+    }
+  });
+}
+
+setupPasswordToggle('btn-toggle-login-pass', 'login-password');
+setupPasswordToggle('btn-toggle-reg-pass', 'reg-password');
+
+
 // ─────────────────────────────────────────────────────────────
 // 4. ROUTE & URL INTENT DETECTION
 // ─────────────────────────────────────────────────────────────

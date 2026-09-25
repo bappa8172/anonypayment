@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#070d18">
+    <meta name="theme-color" content="#050a14">
     <title>Payrail — Merchant Sign In & Registration</title>
     <meta name="description" content="Secure merchant authentication with email 2FA OTP, scrypt password encryption, and instant dashboard access.">
     <link rel="stylesheet" href="./landing.css">
@@ -17,25 +17,33 @@
         justify-content: center;
         align-items: center;
         min-height: 100vh;
-        padding: 40px 16px;
+        padding: 48px 16px;
+        position: relative;
       }
       .auth-container {
         width: 100%;
-        max-width: 500px;
+        max-width: 520px;
         margin: 0 auto;
+        position: relative;
+        z-index: 10;
+        animation: fadeIn 0.45s cubic-bezier(0.16, 1, 0.3, 1);
       }
       .auth-header {
         text-align: center;
-        margin-bottom: 24px;
+        margin-bottom: 28px;
       }
       .auth-brand {
         display: inline-flex;
         align-items: center;
         gap: 10px;
-        font-size: 1.6rem;
+        font-size: 1.7rem;
         font-weight: 800;
         letter-spacing: -0.02em;
         margin-bottom: 8px;
+        transition: transform 0.2s ease;
+      }
+      .auth-brand:hover {
+        transform: scale(1.02);
       }
       .auth-brand span {
         background: linear-gradient(135deg, #00f0ff, #10b981);
@@ -50,27 +58,40 @@
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        font-size: 0.88rem;
+        font-size: 0.9rem;
         font-weight: 600;
         color: var(--text-sub);
-        margin-top: 24px;
-        transition: color 0.2s ease;
+        margin-top: 28px;
+        transition: all 0.2s ease;
       }
       .back-to-home:hover {
         color: var(--accent-cyan);
+        transform: translateX(-3px);
       }
       .already-logged-card {
         display: none;
-        background: rgba(16, 185, 129, 0.12);
-        border: 1px solid rgba(16, 185, 129, 0.35);
+        background: rgba(16, 185, 129, 0.14);
+        border: 1px solid rgba(16, 185, 129, 0.4);
         border-radius: var(--radius-lg);
         padding: 24px;
         text-align: center;
-        margin-bottom: 20px;
+        margin-bottom: 22px;
+        backdrop-filter: blur(12px);
+      }
+      .auth-card {
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6), 0 0 45px rgba(0, 240, 255, 0.08);
+        border: 1px solid rgba(0, 240, 255, 0.25);
       }
     </style>
   </head>
   <body>
+
+    <!-- Ambient Glowing Background Orbs -->
+    <div class="ambient-glow-wrap">
+      <div class="ambient-orb orb-1"></div>
+      <div class="ambient-orb orb-2"></div>
+      <div class="ambient-orb orb-3"></div>
+    </div>
 
     <div class="auth-container">
       
@@ -86,12 +107,12 @@
       <!-- Already Logged In Notice -->
       <div class="already-logged-card" id="card-already-logged">
         <div style="font-size: 1.1rem; font-weight: 700; color: #10b981; margin-bottom: 6px;">
-          ✓ You are already signed in!
+          ✓ Active Session Detected
         </div>
-        <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 16px;">
+        <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 18px;">
           Authenticated as: <strong id="logged-user-name" style="color: #fff;"></strong>
         </p>
-        <div style="display: flex; gap: 10px; justify-content: center;">
+        <div style="display: flex; gap: 12px; justify-content: center;">
           <a href="/dashboard" class="btn btn-emerald btn-sm">Enter Dashboard →</a>
           <button type="button" class="btn btn-ghost btn-sm" id="btn-switch-account">Switch Account</button>
         </div>
@@ -121,10 +142,15 @@
 
             <div class="form-group">
               <label class="form-label">Password</label>
-              <input type="password" id="login-password" class="form-input" placeholder="••••••••••••" required autocomplete="current-password">
+              <div class="password-wrap">
+                <input type="password" id="login-password" class="form-input" placeholder="••••••••••••" required autocomplete="current-password">
+                <button type="button" class="btn-eye-toggle" id="btn-toggle-login-pass" title="Show/Hide Password" aria-label="Toggle password visibility">
+                  👁️
+                </button>
+              </div>
             </div>
 
-            <button type="submit" id="btn-submit-login" class="btn btn-primary btn-block" style="margin-top: 8px;">
+            <button type="submit" id="btn-submit-login" class="btn btn-primary btn-block" style="margin-top: 10px;">
               Continue with 2FA Code →
             </button>
 
@@ -136,8 +162,8 @@
           <!-- Step 2: Login 2FA OTP -->
           <form id="form-login-step2" style="display: none;">
             <div class="otp-box">
-              <div style="font-weight: 700; color: var(--accent-cyan); font-size: 1rem;">Enter 2FA Security Code</div>
-              <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">
+              <div style="font-weight: 700; color: var(--accent-cyan); font-size: 1.05rem;">Enter 2FA Security Code</div>
+              <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 6px;">
                 We sent a 6-digit verification code to <strong id="otp-login-email-preview" style="color: #fff;"></strong>
               </p>
 
@@ -186,10 +212,15 @@
 
             <div class="form-group">
               <label class="form-label">Password (min 8 characters)</label>
-              <input type="password" id="reg-password" class="form-input" placeholder="••••••••••••" minlength="8" required autocomplete="new-password">
+              <div class="password-wrap">
+                <input type="password" id="reg-password" class="form-input" placeholder="••••••••••••" minlength="8" required autocomplete="new-password">
+                <button type="button" class="btn-eye-toggle" id="btn-toggle-reg-pass" title="Show/Hide Password" aria-label="Toggle password visibility">
+                  👁️
+                </button>
+              </div>
             </div>
 
-            <button type="submit" id="btn-submit-signup" class="btn btn-primary btn-block" style="margin-top: 8px;">
+            <button type="submit" id="btn-submit-signup" class="btn btn-primary btn-block" style="margin-top: 10px;">
               Send 6-Digit Email Code →
             </button>
 
@@ -201,8 +232,8 @@
           <!-- Step 2: Signup OTP Verification -->
           <form id="form-signup-step2" style="display: none;">
             <div class="otp-box">
-              <div style="font-weight: 700; color: var(--accent-cyan); font-size: 1rem;">Confirm Your Email</div>
-              <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">
+              <div style="font-weight: 700; color: var(--accent-cyan); font-size: 1.05rem;">Confirm Your Email</div>
+              <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 6px;">
                 Enter the 6-digit code sent to <strong id="otp-signup-email-preview" style="color: #fff;"></strong>
               </p>
 

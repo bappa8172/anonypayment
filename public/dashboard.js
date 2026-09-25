@@ -605,6 +605,20 @@ document.getElementById('btn-toggle-backup-key')?.addEventListener('click', () =
   }
 });
 
+document.getElementById('btn-toggle-seed-phrase')?.addEventListener('click', () => {
+  const box = document.getElementById('backup-mnemonic-text');
+  const btn = document.getElementById('btn-toggle-seed-phrase');
+  if (box.style.filter === 'none') {
+    box.style.filter = 'blur(8px)';
+    box.style.userSelect = 'none';
+    btn.textContent = '👁️ Reveal Seed Phrase';
+  } else {
+    box.style.filter = 'none';
+    box.style.userSelect = 'text';
+    btn.textContent = '🔒 Hide Seed Phrase';
+  }
+});
+
 document.getElementById('btn-copy-backup-key')?.addEventListener('click', async () => {
   const input = document.getElementById('backup-treasury-key');
   await navigator.clipboard.writeText(input.value);
@@ -1336,13 +1350,6 @@ document.getElementById('btn-resend-reg-otp')?.addEventListener('click', async (
     statusEl.textContent = err.message;
     statusEl.style.display = 'block';
   }
-});
-
-// Quick Admin Login
-document.getElementById('btn-quick-admin-login')?.addEventListener('click', () => {
-  document.getElementById('login-email').value = 'admin@gateway.local';
-  document.getElementById('login-password').value = 'AdminGateway#2026!SecureKey';
-  document.getElementById('btn-submit-login').click();
 });
 
 // Logout
