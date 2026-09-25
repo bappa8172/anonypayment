@@ -455,7 +455,7 @@ export async function notifyInvoiceCreated({ invoice, merchant }) {
   const customerEmail = invoice?.customer_email || invoice?.customerEmail;
   if (!invoice || !customerEmail) return null;
 
-  const checkoutUrl = `${config.publicUrl}/?invoiceId=${invoice.id}`;
+  const checkoutUrl = `${config.publicUrl}/pay?invoice=${invoice.id}`;
   const html = buildInvoiceCreatedHtml({ invoice, merchant, checkoutUrl });
   const orderRef = invoice.order_id || invoice.orderId || invoice.id.slice(0, 8);
   const subject = `Invoice #${orderRef} from ${merchant?.business_name || 'Payrail Merchant'}`;

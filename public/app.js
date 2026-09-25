@@ -33,6 +33,19 @@ const btnSaveEmail = document.getElementById('btn-save-email');
 const emailStatusMsg = document.getElementById('email-status-msg');
 const toastMsg = document.getElementById('toast-msg');
 
+// Email Gate Elements (Ask email first before showing payment screen)
+const emailGateCard = document.getElementById('email-gate-card');
+const formEmailGate = document.getElementById('form-email-gate');
+const gateCustomerEmail = document.getElementById('gate-customer-email');
+const gateCustomerName = document.getElementById('gate-customer-name');
+const gateErrorMsg = document.getElementById('gate-error-msg');
+const btnGateSubmit = document.getElementById('btn-gate-submit');
+const gateTitleText = document.getElementById('gate-title-text');
+const gateAmountDisplay = document.getElementById('gate-amount-display');
+const gateMerchantName = document.getElementById('gate-merchant-name');
+const invoiceEmailSentBanner = document.getElementById('invoice-email-sent-banner');
+const bannerCustomerEmail = document.getElementById('banner-customer-email');
+
 let currentInvoice = null;
 let timerInterval = null;
 let pollInterval = null;
@@ -147,12 +160,21 @@ function startCountdown(expiresAt) {
 function renderInvoice(invoice) {
   currentInvoice = invoice;
 
-  amountEl.textContent = `${invoice.amount} ${invoice.symbol || invoice.currency.split('_')[0]}`;
-  networkBadge.innerHTML = `<span class="pulse-dot"></span> <span>${invoice.network || 'BSC Network'}</span>`;
-  networkDesc.textContent = `Send exact amount on BNB Smart Chain (Chain ID: ${invoice.chainId || 56})`;
+  if (emailGateCard) emailGateCard.style.display = 'none';
+  if (paymentCard && invoice.status !== 'confirmed' && invoice.status !== 'paid') {
+    paymentCard.style.display = 'block';
+  }
 
-  addressEl.textContent = invoice.address;
-  copyAddressBtn.disabled = false;
+  if (invoice.customerEmail && invoiceEmailSentBanner && bannerCustomerEmail) {
+    bannerCustomerEmail.textContent = invoice.customerEmail;
+    invoiceEmailSentBanner.style.display = 'flex';
+  }
+
+  if (amountEl) amountEl.textContent = `${invoice.amount} ${invoice.symbol || invoice.currency.split('_')[0]}`;
+  if (networkBadge) networkBadge.innerHTML = `<span class="pulse-dot"></span> <span>${invoice.network || 'BSC Network'}</span>`;
+  if (networkDesc) networkDesc.textContent = `Send exact amount on BNB Smart Chain (Chain ID: ${invoice.chainId || 56})`;
+  if (addressEl) addressEl.textContent = invoice.address;
+  if (copyAddressBtn) copyAddressBtn.disabled = false;
 
   if (invoice.status === 'confirmed' || invoice.status === 'paid') {
     if (timerInterval) clearInterval(timerInterval);
@@ -208,6 +230,57 @@ function renderInvoice(invoice) {
   }
 }
 
+// Universal Email Capture Gate Controller
+function showEmailGate(data) {
+  if (paymentCard) paymentCard.style.display = 'none';
+  if (noInvoiceCard) noInvoiceCard.style.display = 'none';
+  const successCard = document.getElementById('payment-success-card');
+  if (successCard) successCard.style.display = 'none';
+
+  if (!emailGateCard) return;
+  emailGateCard.style.display = 'block';
+
+  if (gateTitleText) gateTitleText.textContent = data.title || 'Crypto Payment';
+  if (gateAmountDisplay) gateAmountDisplay.textContent = `${data.amount} ${data.currency}`;
+  if (gateMerchantName) gateMerchantName.textContent = data.merchantName || 'PAYMENT CHECKOUT';
+  if (gateErrorMsg) gateErrorMsg.style.display = 'none';
+
+  if (formEmailGate) {
+    formEmailGate.onsubmit = async (e) => {
+      e.preventDefault();
+      if (gateErrorMsg) gateErrorMsg.style.display = 'none';
+      const email = gateCustomerEmail ? gateCustomerEmail.value.trim() : '';
+      const name = gateCustomerName ? gateCustomerName.value.trim() : '';
+
+      if (!email || !email.includes('@')) {
+        if (gateErrorMsg) {
+          gateErrorMsg.textContent = 'Please enter a valid email address.';
+          gateErrorMsg.style.display = 'block';
+        }
+        return;
+      }
+
+      if (btnGateSubmit) {
+        btnGateSubmit.disabled = true;
+        btnGateSubmit.textContent = '✉️ Sending Invoice & Loading Checkout…';
+      }
+
+      try {
+        await data.onProceed(email, name);
+      } catch (err) {
+        if (gateErrorMsg) {
+          gateErrorMsg.textContent = err.message || 'Failed to process email. Please retry.';
+          gateErrorMsg.style.display = 'block';
+        }
+        if (btnGateSubmit) {
+          btnGateSubmit.disabled = false;
+          btnGateSubmit.textContent = 'Send Invoice & Continue to Payment →';
+        }
+      }
+    };
+  }
+}
+
 // Fetch Invoice from Server
 async function fetchInvoice() {
   if (!invoiceId) return;
@@ -215,40 +288,104 @@ async function fetchInvoice() {
   try {
     const res = await fetch(`/v1/invoices/${encodeURIComponent(invoiceId)}`, { cache: 'no-store' });
     if (!res.ok) {
-      paymentCard.style.display = 'none';
-      noInvoiceCard.style.display = 'block';
+      if (paymentCard) paymentCard.style.display = 'none';
+      if (emailGateCard) emailGateCard.style.display = 'none';
+      if (noInvoiceCard) noInvoiceCard.style.display = 'block';
       return;
     }
     const invoice = await res.json();
+
+    // If invoice is pending and has NO customer email, ask for email first before showing payment
+    if (invoice.status === 'pending' && !invoice.customerEmail && !window._emailGatePassed) {
+      showEmailGate({
+        title: invoice.description || (invoice.orderId ? `Order #${invoice.orderId}` : 'Payment Invoice'),
+        amount: invoice.amount,
+        currency: invoice.symbol || invoice.currency.split('_')[0],
+        merchantName: invoice.merchantName || 'CRYPTO INVOICE',
+        onProceed: async (email, name) => {
+          const updateRes = await fetch(`/v1/invoices/${encodeURIComponent(invoice.id)}/customer-email`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, name }),
+          });
+          const updateData = await updateRes.json();
+          if (!updateRes.ok) throw new Error(updateData.error || 'Failed to register email');
+
+          window._emailGatePassed = true;
+          if (emailGateCard) emailGateCard.style.display = 'none';
+          if (paymentCard) paymentCard.style.display = 'block';
+
+          if (invoiceEmailSentBanner && bannerCustomerEmail) {
+            bannerCustomerEmail.textContent = email;
+            invoiceEmailSentBanner.style.display = 'flex';
+          }
+
+          invoice.customerEmail = email;
+          renderInvoice(invoice);
+          showToast(`✉️ Invoice email dispatched to ${email}!`);
+        },
+      });
+      return;
+    }
+
     renderInvoice(invoice);
   } catch (err) {
     console.error('Fetch error:', err);
   }
 }
 
-// Payment Link Auto-Resolver
+// Payment Link Auto-Resolver (Asks Email First -> Sends Email -> Shows Payment Screen)
 async function resolvePaymentLink(code) {
-  if (statusText) statusText.textContent = 'Generating on-chain checkout for payment link…';
   try {
-    const res = await fetch(`/v1/payment-links/${encodeURIComponent(code)}/checkout`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-    });
-
+    const res = await fetch(`/v1/payment-links/${encodeURIComponent(code)}`);
     if (!res.ok) {
-      paymentCard.style.display = 'none';
-      noInvoiceCard.style.display = 'block';
+      if (paymentCard) paymentCard.style.display = 'none';
+      if (emailGateCard) emailGateCard.style.display = 'none';
+      if (noInvoiceCard) noInvoiceCard.style.display = 'block';
       return;
     }
 
-    const invoice = await res.json();
-    invoiceId = invoice.id;
-    window.history.replaceState({}, '', `/pay?invoice=${invoice.id}`);
-    renderInvoice(invoice);
-    pollInterval = setInterval(fetchInvoice, 3000);
+    const link = await res.json();
+
+    // Step 1: Prompt customer email first!
+    showEmailGate({
+      title: link.title || `Payment Link #${link.code}`,
+      amount: link.amount,
+      currency: link.currency.split('_')[0],
+      merchantName: link.merchant_name || 'CRYPTO CHECKOUT',
+      onProceed: async (email, name) => {
+        const checkoutRes = await fetch(`/v1/payment-links/${encodeURIComponent(code)}/checkout`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ customerEmail: email, customerName: name }),
+        });
+
+        const invoice = await checkoutRes.json();
+        if (!checkoutRes.ok) {
+          throw new Error(invoice.error || 'Failed to initialize payment');
+        }
+
+        invoiceId = invoice.id;
+        window._emailGatePassed = true;
+        window.history.replaceState({}, '', `/pay?invoice=${invoice.id}`);
+
+        if (emailGateCard) emailGateCard.style.display = 'none';
+        if (paymentCard) paymentCard.style.display = 'block';
+
+        if (invoiceEmailSentBanner && bannerCustomerEmail) {
+          bannerCustomerEmail.textContent = email;
+          invoiceEmailSentBanner.style.display = 'flex';
+        }
+
+        renderInvoice(invoice);
+        pollInterval = setInterval(fetchInvoice, 3000);
+        showToast(`✉️ Invoice email dispatched to ${email}!`);
+      },
+    });
   } catch (err) {
-    paymentCard.style.display = 'none';
-    noInvoiceCard.style.display = 'block';
+    if (paymentCard) paymentCard.style.display = 'none';
+    if (emailGateCard) emailGateCard.style.display = 'none';
+    if (noInvoiceCard) noInvoiceCard.style.display = 'block';
   }
 }
 

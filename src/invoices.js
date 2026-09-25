@@ -267,6 +267,22 @@ export async function updateInvoiceCustomerEmail(id, customerEmail, customerName
     [id, customerEmail, customerName]
   );
   const updated = await getInvoice(id);
+
+  // If pending, dispatch invoice details email to customer
+  if (updated && updated.status === 'pending') {
+    try {
+      let merchant = null;
+      if (updated.merchant_id) {
+        const mRes = await query('SELECT * FROM merchants WHERE id = $1', [updated.merchant_id]);
+        merchant = mRes.rows[0] || null;
+      }
+      await notifyInvoiceCreated({ invoice: updated, merchant });
+    } catch (mailErr) {
+      logger.warn({ err: mailErr.message, invoiceId: id }, 'Failed to send invoice creation email');
+    }
+  }
+
+  // If already paid or confirmed, dispatch payment receipt
   if ((updated.status === 'confirmed' || updated.status === 'paid') && !updated.receipt_email_sent) {
     try {
       await notifyPaymentReceived({
@@ -354,7 +370,12 @@ export async function createPaymentLink({
 }
 
 export async function getPaymentLinkByCode(code) {
-  const res = await query('SELECT * FROM payment_links WHERE code = $1', [code]);
+  const res = await query(`
+    SELECT pl.*, m.business_name as merchant_name
+    FROM payment_links pl
+    LEFT JOIN merchants m ON m.id = pl.merchant_id
+    WHERE pl.code = $1
+  `, [code]);
   return res.rows[0];
 }
 

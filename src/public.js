@@ -89,6 +89,9 @@ router.post('/payment-links/:code/checkout', async (req, res, next) => {
     const link = await getPaymentLinkByCode(req.params.code);
     if (!link) return res.status(404).json({ error: 'Payment link not found' });
 
+    const customerEmail = (req.body?.customerEmail || req.body?.email || '').trim() || null;
+    const customerName = (req.body?.customerName || req.body?.name || '').trim() || null;
+
     const invoice = await createInvoice({
       currency: link.currency,
       amount: link.amount,
@@ -96,6 +99,8 @@ router.post('/payment-links/:code/checkout', async (req, res, next) => {
       walletId: link.wallet_id || 'default',
       description: link.title,
       orderId: `LINK-${link.code}`,
+      customerEmail,
+      customerName,
       metadata: { paymentLinkCode: link.code, title: link.title },
     });
     return res.json(invoice);
