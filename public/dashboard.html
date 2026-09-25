@@ -416,12 +416,15 @@
 
           <!-- Code Integration Snippets -->
           <div style="margin-top: 24px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
               <h4 style="font-size: 1rem;">1. Create an Invoice & Hosted Checkout (API Call)</h4>
-              <div class="snippet-tabs">
-                <button class="snippet-tab-btn active" onclick="switchSnippetLang('curl')">cURL</button>
-                <button class="snippet-tab-btn" onclick="switchSnippetLang('node')">Node.js</button>
-                <button class="snippet-tab-btn" onclick="switchSnippetLang('python')">Python</button>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <div class="snippet-tabs" style="margin-bottom: 0;">
+                  <button class="snippet-tab-btn active" onclick="switchSnippetLang('curl')">cURL</button>
+                  <button class="snippet-tab-btn" onclick="switchSnippetLang('node')">Node.js</button>
+                  <button class="snippet-tab-btn" onclick="switchSnippetLang('python')">Python</button>
+                </div>
+                <button class="btn btn-secondary btn-sm" id="btn-copy-code-snippet" onclick="copyToClipboard(document.getElementById('snippet-create-invoice').textContent.trim(), this, 'Code snippet copied!')">📋 Copy</button>
               </div>
             </div>
 
@@ -442,8 +445,11 @@ curl -X POST http://localhost:3000/v1/merchant/invoices \
 
           <!-- Webhook verification guide -->
           <div style="margin-top: 24px;">
-            <h4 style="font-size: 1rem; margin-bottom: 10px;">2. Webhook Verification (HMAC-SHA256)</h4>
-            <div class="code-snippet-box">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <h4 style="font-size: 1rem; margin: 0;">2. Webhook Verification (HMAC-SHA256)</h4>
+              <button class="btn btn-secondary btn-sm" onclick="copyToClipboard(document.getElementById('snippet-webhook-verify').textContent.trim(), this, 'Webhook code copied!')">📋 Copy</button>
+            </div>
+            <div class="code-snippet-box" id="snippet-webhook-verify">
 // Node.js Express example to verify and credit order
 import crypto from 'crypto';
 
@@ -1064,6 +1070,91 @@ app.post('/api/crypto-webhook', express.raw({ type: 'application/json' }), (req,
         <button type="button" class="btn btn-secondary" data-close="modal-backup">Close</button>
       </div>
     </div>
+  </div>
+
+  <!-- MODAL: EMBED CODE -->
+  <div class="modal-backdrop" id="modal-embed-code" style="display: none;">
+    <div class="modal" style="max-width: 620px;">
+      <div class="modal-header">
+        <h3 id="modal-embed-title" style="display: flex; align-items: center; gap: 8px;">
+          <span>🌐</span> Website Payment Button
+        </h3>
+        <button class="modal-close" data-close="modal-embed-code">&times;</button>
+      </div>
+      <div class="modal-body" style="display: flex; flex-direction: column; gap: 18px;">
+        <p style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.5;">
+          Copy and paste this HTML snippet directly into your website, web store, or blog to accept crypto payments instantly.
+        </p>
+
+        <div>
+          <label style="display: block; font-size: 0.78rem; font-weight: 700; color: #94a3b8; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">Live Button Preview</label>
+          <div style="background: rgba(0,0,0,0.4); border: 1px dashed var(--border); border-radius: 12px; padding: 24px; display: flex; align-items: center; justify-content: center;" id="modal-embed-preview">
+            <!-- preview injected here -->
+          </div>
+        </div>
+
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <label style="font-size: 0.78rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">HTML Embed Snippet</label>
+            <button class="btn btn-secondary btn-sm" id="btn-copy-embed-code">📋 Copy Snippet</button>
+          </div>
+          <div class="code-snippet-box" id="modal-embed-snippet-text" style="max-height: 160px; user-select: all; font-size: 0.82rem;"></div>
+        </div>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button type="button" class="btn btn-secondary" data-close="modal-embed-code">Close</button>
+        <button type="button" class="btn btn-primary" id="btn-copy-embed-code-footer">📋 Copy Code</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: INVOICE CREATED SUCCESS -->
+  <div class="modal-backdrop" id="modal-invoice-success" style="display: none;">
+    <div class="modal" style="max-width: 580px;">
+      <div class="modal-header">
+        <h3 style="color: #34d399; display: flex; align-items: center; gap: 8px;">
+          <span>🎉</span> Invoice Created Successfully!
+        </h3>
+        <button class="modal-close" data-close="modal-invoice-success">&times;</button>
+      </div>
+      <div class="modal-body" style="display: flex; flex-direction: column; gap: 16px;">
+        <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 12px; padding: 16px; display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <div style="font-size: 0.78rem; color: #94a3b8; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Invoice Total</div>
+            <div id="new-inv-amount" style="font-size: 1.5rem; font-weight: 800; color: #fff;">0.00 BNB</div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 0.78rem; color: #94a3b8; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Status</div>
+            <span class="badge badge-pending" style="font-size: 0.82rem; padding: 4px 10px;">PENDING</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Hosted Customer Checkout URL</label>
+          <div class="input-copy-wrap" style="display: flex; gap: 8px;">
+            <input type="text" id="new-inv-url" class="form-input" readonly style="font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;">
+            <button class="btn btn-primary" id="btn-copy-new-inv-url" style="white-space: nowrap; padding: 0 16px;">📋 Copy Link</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Customer Deposit Address</label>
+          <div class="input-copy-wrap" style="display: flex; gap: 8px;">
+            <input type="text" id="new-inv-addr" class="form-input" readonly style="font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;">
+            <button class="btn btn-secondary" id="btn-copy-new-inv-addr" style="white-space: nowrap; padding: 0 16px;">📋 Copy Address</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+        <button type="button" class="btn btn-secondary" data-close="modal-invoice-success">Done</button>
+        <button type="button" class="btn btn-primary" id="btn-open-new-inv-checkout">↗ Open Checkout Page</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modern Floating Toast -->
+  <div class="dashboard-toast" id="dashboard-toast">
+    <span id="dashboard-toast-msg">Copied to clipboard! ✓</span>
   </div>
 
   <script src="./dashboard.js"></script>

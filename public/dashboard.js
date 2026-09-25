@@ -71,6 +71,80 @@ function getAddressExplorerUrl(address, currency = 'BNB_BSC') {
   return `https://bscscan.com/address/${address}`;
 }
 
+// Modern Floating Toast Notification
+window.showToast = function(msg = 'Copied to clipboard! ✓', type = 'success') {
+  const toast = document.getElementById('dashboard-toast');
+  const toastMsg = document.getElementById('dashboard-toast-msg');
+  if (!toast) return;
+  if (toastMsg) toastMsg.textContent = msg;
+
+  if (type === 'error') {
+    toast.style.background = 'rgba(239, 68, 68, 0.95)';
+    toast.style.boxShadow = '0 10px 30px rgba(0, 0, 0, 0.6), 0 0 20px rgba(239, 68, 68, 0.4)';
+  } else if (type === 'info') {
+    toast.style.background = 'rgba(59, 130, 246, 0.95)';
+    toast.style.boxShadow = '0 10px 30px rgba(0, 0, 0, 0.6), 0 0 20px rgba(59, 130, 246, 0.4)';
+  } else {
+    toast.style.background = 'rgba(16, 185, 129, 0.95)';
+    toast.style.boxShadow = '0 10px 30px rgba(0, 0, 0, 0.6), 0 0 20px rgba(16, 185, 129, 0.3)';
+  }
+
+  toast.classList.add('show');
+  clearTimeout(window._toastTimeout);
+  window._toastTimeout = setTimeout(() => {
+    toast.classList.remove('show');
+  }, 2600);
+};
+
+// Universal Bulletproof Clipboard Copy with Automatic Fallback & Visual Feedback
+window.copyToClipboard = async function(text, triggerEl = null, toastMsg = 'Copied to clipboard! ✓') {
+  if (!text) return false;
+  let success = false;
+
+  if (navigator.clipboard && window.isSecureContext) {
+    try {
+      await navigator.clipboard.writeText(text);
+      success = true;
+    } catch (err) {
+      console.warn('navigator.clipboard failed, using fallback:', err);
+    }
+  }
+
+  if (!success) {
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-999999px';
+      textarea.style.top = '-999999px';
+      textarea.setAttribute('readonly', '');
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      success = document.execCommand('copy');
+      document.body.removeChild(textarea);
+    } catch (err) {
+      console.error('execCommand copy failed:', err);
+    }
+  }
+
+  // Visual button feedback
+  if (triggerEl) {
+    const originalHtml = triggerEl.innerHTML;
+    triggerEl.classList.add('btn-copied');
+    triggerEl.innerHTML = '✓ Copied!';
+    setTimeout(() => {
+      triggerEl.classList.remove('btn-copied');
+      triggerEl.innerHTML = originalHtml;
+    }, 1800);
+  }
+
+  showToast(toastMsg);
+  return success;
+};
+
+window.copyText = (text, btn) => window.copyToClipboard(text, btn);
+
 // DOM Elements
 const navItems = document.querySelectorAll('.nav-item');
 const tabPanes = document.querySelectorAll('.tab-pane');
@@ -207,7 +281,10 @@ function renderInvoicesTable(tbodyId, invoices, isOverview = false) {
         ${!isOverview ? `<td>${inv.txid ? `<a href="${inv.txid.startsWith('0x') ? getTxExplorerUrl(inv.txid, inv.currency) : '#'}" target="_blank">${inv.txid.slice(0, 10)}… ↗</a>` : '—'}</td>` : ''}
         <td>${date}</td>
         <td>
-          <a class="btn-text" href="${checkoutUrl}" target="_blank">Checkout ↗</a>
+          <div style="display:inline-flex; gap:6px; align-items:center;">
+            <button class="btn btn-secondary btn-sm" onclick="copyToClipboard('${window.location.origin}${checkoutUrl}', this, 'Checkout link copied!')" title="Copy Hosted Checkout URL">📋 Copy</button>
+            <a class="btn btn-primary btn-sm" href="${checkoutUrl}" target="_blank" style="text-decoration:none;" title="Open Hosted Checkout">Open ↗</a>
+          </div>
         </td>
       </tr>
     `;
@@ -271,12 +348,9 @@ async function loadDepositAddress() {
 }
 
 document.getElementById('deposit-currency-select')?.addEventListener('change', loadDepositAddress);
-document.getElementById('btn-copy-deposit-addr')?.addEventListener('click', async () => {
+document.getElementById('btn-copy-deposit-addr')?.addEventListener('click', function() {
   const addr = document.getElementById('deposit-address-input').value;
-  await navigator.clipboard.writeText(addr);
-  const btn = document.getElementById('btn-copy-deposit-addr');
-  btn.textContent = 'Copied!';
-  setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+  copyToClipboard(addr, this, 'Deposit address copied!');
 });
 
 // Withdraw flow
@@ -437,6 +511,7 @@ async function loadPaymentLinks() {
       const date = new Date(link.created_at).toLocaleDateString();
       const origin = window.location.origin;
       const payUrl = `${origin}/link/${link.code}`;
+      const safeTitle = (link.title || '').replace(/'/g, "\\'");
 
       return `
         <tr>
@@ -444,10 +519,15 @@ async function loadPaymentLinks() {
           <td>${link.amount} ${link.currency.split('_')[0]}</td>
           <td>${link.currency}</td>
           <td><code>${link.code}</code></td>
-          <td><button class="btn-text" onclick="copyText('${payUrl}')">Copy Checkout URL</button></td>
+          <td>
+            <div style="display:inline-flex; gap:6px; align-items:center;">
+              <button class="btn btn-secondary btn-sm" onclick="copyToClipboard('${payUrl}', this, 'Payment link copied!')">📋 Copy Link</button>
+              <a class="btn btn-text btn-sm" href="${payUrl}" target="_blank" style="text-decoration:none;">Open ↗</a>
+            </div>
+          </td>
           <td>${date}</td>
           <td>
-            <button class="btn btn-secondary btn-sm" onclick="embedSnippet('${link.code}', '${link.title}', '${link.amount}')">Get Embed Code</button>
+            <button class="btn btn-primary btn-sm" onclick="openEmbedModal('${link.code}', '${safeTitle}', '${link.amount}', '${link.currency}')">&lt;/&gt; Embed Code</button>
           </td>
         </tr>
       `;
@@ -484,15 +564,37 @@ document.getElementById('form-payment-link')?.addEventListener('submit', async (
   }
 });
 
-window.copyText = async (text) => {
-  await navigator.clipboard.writeText(text);
-  alert('Copied to clipboard: ' + text);
+window.openEmbedModal = (code, title, amount, currency) => {
+  const origin = window.location.origin;
+  const payUrl = `${origin}/link/${code}`;
+  const displayCurrency = currency ? currency.split('_')[0] : 'Crypto';
+  const displayAmount = amount || '';
+  const snippet = `<!-- Payrail Crypto Payment Button -->\n<a href="${payUrl}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#00f0ff,#00a3ff);color:#061520;padding:12px 22px;border-radius:10px;font-weight:700;font-size:15px;text-decoration:none;box-shadow:0 4px 14px rgba(0,240,255,0.3);font-family:system-ui,sans-serif;">\n  ⚡ Pay ${displayAmount} ${displayCurrency} with Crypto\n</a>`;
+
+  const previewEl = document.getElementById('modal-embed-preview');
+  if (previewEl) {
+    previewEl.innerHTML = `<a href="${payUrl}" target="_blank" style="display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#00f0ff,#00a3ff);color:#061520;padding:12px 22px;border-radius:10px;font-weight:700;font-size:15px;text-decoration:none;box-shadow:0 4px 14px rgba(0,240,255,0.3);font-family:system-ui,sans-serif;pointer-events:none;">⚡ Pay ${displayAmount} ${displayCurrency} with Crypto</a>`;
+  }
+
+  const snippetBox = document.getElementById('modal-embed-snippet-text');
+  if (snippetBox) {
+    snippetBox.textContent = snippet;
+  }
+
+  const copyBtn1 = document.getElementById('btn-copy-embed-code');
+  if (copyBtn1) {
+    copyBtn1.onclick = function() { copyToClipboard(snippet, this, 'Embed snippet copied!'); };
+  }
+  const copyBtn2 = document.getElementById('btn-copy-embed-code-footer');
+  if (copyBtn2) {
+    copyBtn2.onclick = function() { copyToClipboard(snippet, this, 'Embed snippet copied!'); };
+  }
+
+  openModal('modal-embed-code');
 };
 
-window.embedSnippet = (code, title, amount) => {
-  const origin = window.location.origin;
-  const snippet = `<!-- Payrail Crypto Button -->\n<a href="${origin}/link/${code}" target="_blank" style="background:#00f0ff; color:#000; padding:10px 18px; border-radius:8px; font-weight:bold; text-decoration:none;">Pay with Crypto (${amount})</a>`;
-  prompt('Copy this HTML snippet to embed on your website:', snippet);
+window.embedSnippet = (code, title, amount, currency) => {
+  openEmbedModal(code, title, amount, currency);
 };
 
 // Create Invoice Form
@@ -527,12 +629,31 @@ document.getElementById('form-create-invoice')?.addEventListener('submit', async
     loadInvoices();
     loadOverview();
 
-    // Offer to open the checkout page immediately
-    if (confirm(`Invoice created for ${data.amount} ${data.currency}!\n\nOpen hosted checkout page now?`)) {
-      window.open(`/pay?invoice=${data.id}`, '_blank');
+    // Show sleek success modal instead of native browser confirm()
+    const payUrl = `${window.location.origin}/pay?invoice=${data.id}`;
+    const amountEl = document.getElementById('new-inv-amount');
+    if (amountEl) amountEl.textContent = `${data.amount} ${data.currency.split('_')[0]}`;
+    const urlEl = document.getElementById('new-inv-url');
+    if (urlEl) urlEl.value = payUrl;
+    const addrEl = document.getElementById('new-inv-addr');
+    if (addrEl) addrEl.value = data.address;
+
+    const copyUrlBtn = document.getElementById('btn-copy-new-inv-url');
+    if (copyUrlBtn) {
+      copyUrlBtn.onclick = function() { copyToClipboard(payUrl, this, 'Checkout URL copied!'); };
     }
+    const copyAddrBtn = document.getElementById('btn-copy-new-inv-addr');
+    if (copyAddrBtn) {
+      copyAddrBtn.onclick = function() { copyToClipboard(data.address, this, 'Deposit address copied!'); };
+    }
+    const openBtn = document.getElementById('btn-open-new-inv-checkout');
+    if (openBtn) {
+      openBtn.onclick = function() { window.open(payUrl, '_blank'); };
+    }
+
+    openModal('modal-invoice-success');
   } catch (err) {
-    alert(`Failed to create invoice: ${err.message}`);
+    showToast(`Failed to create invoice: ${err.message}`, 'error');
   } finally {
     submitBtn.disabled = false;
   }
@@ -569,12 +690,9 @@ document.getElementById('btn-toggle-api-key')?.addEventListener('click', () => {
   }
 });
 
-document.getElementById('btn-copy-api-key')?.addEventListener('click', async () => {
+document.getElementById('btn-copy-api-key')?.addEventListener('click', function() {
   const input = document.getElementById('api-key-input');
-  await navigator.clipboard.writeText(input.value);
-  const btn = document.getElementById('btn-copy-api-key');
-  btn.textContent = 'Copied!';
-  setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+  copyToClipboard(input.value, this, 'Admin API Key copied!');
 });
 
 // Reveal Recovery Phrase / Backup
@@ -589,7 +707,7 @@ document.getElementById('btn-reveal-backup')?.addEventListener('click', async ()
     document.getElementById('backup-treasury-key').value = data.treasuryPrivateKey || 'Private key not available (Watch-only mode)';
     openModal('modal-backup');
   } catch (err) {
-    alert('Error loading backup: ' + err.message);
+    showToast('Error loading backup: ' + err.message, 'error');
   }
 });
 
@@ -619,12 +737,9 @@ document.getElementById('btn-toggle-seed-phrase')?.addEventListener('click', () 
   }
 });
 
-document.getElementById('btn-copy-backup-key')?.addEventListener('click', async () => {
+document.getElementById('btn-copy-backup-key')?.addEventListener('click', function() {
   const input = document.getElementById('backup-treasury-key');
-  await navigator.clipboard.writeText(input.value);
-  const btn = document.getElementById('btn-copy-backup-key');
-  btn.textContent = 'Copied!';
-  setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+  copyToClipboard(input.value, this, 'Central Treasury Private Key copied!');
 });
 
 // Initial Load & Refresh Loop
@@ -789,10 +904,10 @@ async function triggerBatchSweep() {
     });
     const result = await res.json();
     if (!res.ok) throw new Error(result.error || 'Batch sweep failed');
-    alert(`⚡ Batch Sweep Completed!\nChecked: ${result.totalChecked} invoices\nSuccessfully Swept: ${result.sweptCount}`);
+    showToast(`⚡ Batch Sweep: ${result.sweptCount} payment(s) swept to Treasury!`, 'success');
     loadTreasuryOverview();
   } catch (err) {
-    alert(`Batch sweep error: ${err.message}`);
+    showToast(`Batch sweep error: ${err.message}`, 'error');
   } finally {
     if (btn1) btn1.disabled = false;
     if (btn2) btn2.disabled = false;
@@ -808,10 +923,10 @@ window.sweepSingleInvoice = async (invoiceId) => {
     });
     const result = await res.json();
     if (!res.ok) throw new Error(result.error || 'Sweep failed');
-    alert(`✓ Swept successfully!\nAmount: ${result.amount || result.status} ${result.currency || ''}\nTx: ${result.txid || result.status}`);
+    showToast(`✓ Invoice #${invoiceId.slice(0, 8)} swept to Treasury!`, 'success');
     loadTreasuryOverview();
   } catch (err) {
-    alert(`Sweep error: ${err.message}`);
+    showToast(`Sweep error: ${err.message}`, 'error');
   }
 };
 
@@ -846,23 +961,21 @@ document.getElementById('btn-show-treasury-qr')?.addEventListener('click', async
     document.getElementById('treasury-qr-addr-text').textContent = data.address;
     openModal('modal-treasury-qr');
   } catch (e) {
-    alert('Failed to load QR: ' + e.message);
+    showToast('Failed to load QR: ' + e.message, 'error');
   }
 });
 
-document.getElementById('btn-copy-treasury-address')?.addEventListener('click', async () => {
+document.getElementById('btn-copy-treasury-address')?.addEventListener('click', function() {
   const addr = document.getElementById('treasury-master-address').textContent;
   if (addr && addr !== 'Loading…') {
-    await navigator.clipboard.writeText(addr);
-    alert('Copied Central Treasury Address:\n' + addr);
+    copyToClipboard(addr, this, 'Central Treasury Address copied!');
   }
 });
 
-document.getElementById('btn-copy-treasury-qr-addr')?.addEventListener('click', async () => {
+document.getElementById('btn-copy-treasury-qr-addr')?.addEventListener('click', function() {
   const addr = document.getElementById('treasury-qr-addr-text').textContent;
   if (addr && addr !== 'Loading…') {
-    await navigator.clipboard.writeText(addr);
-    alert('Copied Central Treasury Address:\n' + addr);
+    copyToClipboard(addr, this, 'Central Treasury Address copied!');
   }
 });
 
@@ -1377,12 +1490,9 @@ document.getElementById('btn-toggle-mch-api-key')?.addEventListener('click', () 
   }
 });
 
-document.getElementById('btn-copy-mch-api-key')?.addEventListener('click', async () => {
+document.getElementById('btn-copy-mch-api-key')?.addEventListener('click', function() {
   const input = document.getElementById('mch-api-key-input');
-  await navigator.clipboard.writeText(input.value);
-  const btn = document.getElementById('btn-copy-mch-api-key');
-  btn.textContent = 'Copied!';
-  setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+  copyToClipboard(input.value, this, 'Merchant API Key copied!');
 });
 
 document.getElementById('btn-toggle-mch-wh-sec')?.addEventListener('click', () => {
@@ -1397,12 +1507,9 @@ document.getElementById('btn-toggle-mch-wh-sec')?.addEventListener('click', () =
   }
 });
 
-document.getElementById('btn-copy-mch-wh-sec')?.addEventListener('click', async () => {
+document.getElementById('btn-copy-mch-wh-sec')?.addEventListener('click', function() {
   const input = document.getElementById('mch-webhook-secret-input');
-  await navigator.clipboard.writeText(input.value);
-  const btn = document.getElementById('btn-copy-mch-wh-sec');
-  btn.textContent = 'Copied!';
-  setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+  copyToClipboard(input.value, this, 'Webhook Secret copied!');
 });
 
 // Switch snippet languages

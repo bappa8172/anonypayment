@@ -47,6 +47,38 @@ function showToast(msg) {
   }, 2000);
 }
 
+// Bulletproof Clipboard Copy with Automatic Fallback
+async function copyToClipboard(text) {
+  if (!text) return false;
+  let success = false;
+  if (navigator.clipboard && window.isSecureContext) {
+    try {
+      await navigator.clipboard.writeText(text);
+      success = true;
+    } catch (err) {
+      console.warn('navigator.clipboard failed, using fallback:', err);
+    }
+  }
+  if (!success) {
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-999999px';
+      textarea.style.top = '-999999px';
+      textarea.setAttribute('readonly', '');
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      success = document.execCommand('copy');
+      document.body.removeChild(textarea);
+    } catch (err) {
+      console.error('execCommand copy failed:', err);
+    }
+  }
+  return success;
+}
+
 // Payment Mode Tab Switcher
 window.switchCheckoutTab = function(mode) {
   const qrTabBtn = document.getElementById('tab-btn-qr');
@@ -225,16 +257,16 @@ async function resolvePaymentLink(code) {
 
 // Copy Buttons
 copyAddressBtn?.addEventListener('click', async () => {
-  if (!currentInvoice) return;
-  await navigator.clipboard.writeText(currentInvoice.address);
+  if (!currentInvoice || !currentInvoice.address) return;
+  await copyToClipboard(currentInvoice.address);
   showToast('Deposit address copied! ✓');
   copyAddressBtn.textContent = 'Copied!';
   setTimeout(() => { copyAddressBtn.textContent = 'Copy'; }, 1500);
 });
 
 copyAmountBtn?.addEventListener('click', async () => {
-  if (!currentInvoice) return;
-  await navigator.clipboard.writeText(currentInvoice.amount);
+  if (!currentInvoice || !currentInvoice.amount) return;
+  await copyToClipboard(String(currentInvoice.amount));
   showToast('Amount copied! ✓');
   copyAmountBtn.textContent = 'Copied!';
   setTimeout(() => { copyAmountBtn.textContent = 'Copy Amount'; }, 1500);
