@@ -1836,8 +1836,24 @@ async function loadEmailLogs() {
 window.loadEmailLogs = loadEmailLogs;
 document.getElementById('btn-refresh-emails')?.addEventListener('click', loadEmailLogs);
 
-// Start: Check auth state and initiate refresh loop
+document.getElementById('btn-manual-sync')?.addEventListener('click', async () => {
+  const btn = document.getElementById('btn-manual-sync');
+  const syncStatus = document.getElementById('sync-status-text');
+  if (btn) btn.classList.add('loading');
+  if (syncStatus) syncStatus.textContent = 'Syncing...';
+  try {
+    await refreshAll();
+  } finally {
+    setTimeout(() => {
+      if (btn) btn.classList.remove('loading');
+      if (syncStatus) syncStatus.textContent = 'Live Sync (3s)';
+    }, 600);
+  }
+});
+
+// Start: Check auth state and initiate refresh loop (auto-check every 3s)
 checkAuth().then(() => {
   refreshAll();
-  setInterval(refreshAll, 6000);
+  setInterval(refreshAll, 3000);
 });
+

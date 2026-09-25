@@ -69,6 +69,11 @@
       <header class="topbar">
         <h1 id="page-title">Overview</h1>
         <div class="topbar-actions">
+          <div class="live-sync-indicator" id="live-sync-indicator" title="Auto-checking balances and on-chain status every 3 seconds" style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; background: rgba(0, 240, 255, 0.08); border: 1px solid rgba(0, 240, 255, 0.25); border-radius: 20px; font-size: 0.78rem; font-weight: 600; color: #00f0ff;">
+            <span class="pulse-dot" style="width: 7px; height: 7px; border-radius: 50%; background: #00f0ff; box-shadow: 0 0 10px #00f0ff; display: inline-block;"></span>
+            <span id="sync-status-text">Live Sync (3s)</span>
+          </div>
+          <button class="btn btn-secondary btn-sm" id="btn-manual-sync" title="Trigger instant balance & on-chain refresh">🔄 Sync</button>
           <div class="user-profile-badge" id="user-profile-badge">
             <span class="user-badge-tag user-badge-merchant" id="user-role-badge">Merchant</span>
             <span class="user-display-name" id="user-display-name">Loading...</span>

@@ -293,6 +293,6 @@ export async function startEVMMonitor() {
   // Run initial poll
   poll().catch(err => logger.error({ err: err.message }, 'Initial EVM monitor poll error'));
 
-  // Poll every 8 seconds
-  setInterval(poll, 8_000);
+  // Poll every 3.5 seconds (matches BSC 3-second block interval)
+  setInterval(poll, 3_500);
 }

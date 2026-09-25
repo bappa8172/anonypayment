@@ -155,15 +155,10 @@ function renderInvoice(invoice) {
   copyAddressBtn.disabled = false;
 
   if (invoice.status === 'confirmed') {
-    statusIndicator.className = 'status-indicator confirmed';
-    const conf = invoice.confirmations || invoice.confirmationsRequired || 12;
-    const req = invoice.confirmationsRequired || 12;
-    statusText.innerHTML = `<strong>✓ Payment Confirmed!</strong> (${conf}/${req} Confirmations)`;
-    statusText.style.color = '#10b981';
-    timerValue.textContent = 'Completed';
-    timerValue.style.color = '#10b981';
     if (timerInterval) clearInterval(timerInterval);
     if (pollInterval) clearInterval(pollInterval);
+    showPaymentSuccessScreen(invoice);
+    return;
   } else if (invoice.status === 'paid') {
     statusIndicator.className = 'status-indicator paid';
     const conf = invoice.confirmations || 1;
@@ -392,6 +387,71 @@ btnSaveEmail?.addEventListener('click', async () => {
     btnSaveEmail.textContent = 'Save';
   }
 });
+
+// Render Full Payment Success Card
+function showPaymentSuccessScreen(invoice) {
+  const checkoutCard = document.getElementById('checkout-card');
+  const successCard = document.getElementById('payment-success-card');
+  if (!successCard) return;
+
+  if (checkoutCard) checkoutCard.style.display = 'none';
+  successCard.style.display = 'block';
+
+  const amountDisplay = `${invoice.amount} ${invoice.symbol || invoice.currency.split('_')[0]}`;
+  const successAmount = document.getElementById('success-amount');
+  if (successAmount) successAmount.textContent = amountDisplay;
+
+  const successNetwork = document.getElementById('success-network');
+  if (successNetwork) successNetwork.textContent = `${invoice.network || 'BNB Smart Chain'} (Chain ID: ${invoice.chainId || 56})`;
+
+  const successOrder = document.getElementById('success-order');
+  if (successOrder) successOrder.textContent = invoice.orderId ? `Order #${invoice.orderId}` : (invoice.description || `Invoice #${invoice.id.slice(0, 8)}`);
+
+  const txLink = document.getElementById('success-tx-link');
+  if (txLink) {
+    if (invoice.txid) {
+      txLink.href = invoice.explorerTx || (invoice.txid.startsWith('0x') ? `https://bscscan.com/tx/${invoice.txid}` : `https://bscscan.com/address/${invoice.address}`);
+      txLink.textContent = invoice.txid.startsWith('0x') ? `${invoice.txid.slice(0, 10)}…${invoice.txid.slice(-6)} ↗` : 'Verified on BscScan ↗';
+    } else {
+      txLink.href = invoice.explorerAddress || `https://bscscan.com/address/${invoice.address}`;
+      txLink.textContent = 'View on BscScan ↗';
+    }
+  }
+
+  const receiptNote = document.getElementById('success-receipt-note');
+  if (receiptNote) {
+    if (invoice.customerEmail) {
+      receiptNote.innerHTML = `<span>✉️</span> Official payment receipt sent to <strong>${invoice.customerEmail}</strong>`;
+      receiptNote.style.display = 'flex';
+    } else {
+      receiptNote.style.display = 'none';
+    }
+  }
+
+  // Handle redirect if configured on payment link
+  const redirectUrl = invoice.redirectUrl || (invoice.metadata && invoice.metadata.redirectUrl);
+  if (redirectUrl) {
+    const redirectWrap = document.getElementById('success-redirect-wrap');
+    const redirectBtn = document.getElementById('btn-success-redirect');
+    const countdownEl = document.getElementById('success-countdown');
+
+    if (redirectWrap) redirectWrap.style.display = 'block';
+    if (redirectBtn) {
+      redirectBtn.href = redirectUrl;
+      redirectBtn.style.display = 'block';
+    }
+
+    let secondsLeft = 5;
+    const redirectTimer = setInterval(() => {
+      secondsLeft -= 1;
+      if (countdownEl) countdownEl.textContent = secondsLeft;
+      if (secondsLeft <= 0) {
+        clearInterval(redirectTimer);
+        window.location.href = redirectUrl;
+      }
+    }, 1000);
+  }
+}
 
 // Entry Point Initialization
 document.addEventListener('DOMContentLoaded', () => {

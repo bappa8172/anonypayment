@@ -51,7 +51,7 @@ const paymentLinkSchema = z.object({
 
 // Helper to determine wallet ID with strict merchant isolation
 function resolveWalletId(req) {
-  if (req.user && req.user.role === 'merchant') {
+  if (req.user?.walletId && req.user.walletId !== 'default') {
     return req.user.walletId;
   }
   return req.query?.walletId || req.body?.walletId || req.user?.walletId || 'default';
@@ -132,7 +132,7 @@ router.get('/wallet/ledger', async (req, res) => {
 router.post('/payment-links', async (req, res) => {
   try {
     const data = paymentLinkSchema.parse(req.body);
-    const merchantId = req.user?.role === 'merchant' ? req.user.id : null;
+    const merchantId = (req.user && req.user.id !== 'admin') ? req.user.id : (req.body?.merchantId || req.user?.id || null);
     const walletId = resolveWalletId(req);
 
     const link = await createPaymentLink({
@@ -150,7 +150,7 @@ router.post('/payment-links', async (req, res) => {
 router.get('/payment-links', async (req, res) => {
   try {
     const limit = parseInt(req.query.limit || '50', 10);
-    const merchantId = req.user?.role === 'merchant' ? req.user.id : (req.query.merchantId || null);
+    const merchantId = (req.user && req.user.id !== 'admin') ? req.user.id : (req.query.merchantId || null);
     const links = await listPaymentLinks({ limit, merchantId });
     res.json({ links });
   } catch (err) {
@@ -161,7 +161,7 @@ router.get('/payment-links', async (req, res) => {
 // 8. Stats for Dashboard Overview (Scoped to merchant or global for Admin)
 router.get('/stats', async (req, res) => {
   try {
-    const merchantId = req.user?.role === 'merchant' ? req.user.id : null;
+    const merchantId = (req.user && req.user.id !== 'admin') ? req.user.id : (req.query.merchantId || null);
     const walletId = resolveWalletId(req);
     const stats = await getGatewayStats(merchantId);
     const balances = await getWalletBalances(walletId);

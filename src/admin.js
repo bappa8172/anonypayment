@@ -28,7 +28,7 @@ router.get('/invoices', async (req, res) => {
   try {
     const limit = parseInt(req.query.limit || '50', 10);
     const status = req.query.status || null;
-    const merchantId = req.user.role === 'merchant' ? req.user.id : (req.query.merchantId || null);
+    const merchantId = (req.user && req.user.id !== 'admin') ? req.user.id : (req.query.merchantId || null);
 
     const invoices = await listInvoices({ limit, status, merchantId });
     res.json({ invoices });
@@ -41,8 +41,8 @@ router.get('/invoices', async (req, res) => {
 router.post('/invoices', async (req, res) => {
   try {
     const data = createInvoiceSchema.parse(req.body);
-    const merchantId = req.user.role === 'merchant' ? req.user.id : (data.merchantId || null);
-    const walletId = req.user.role === 'merchant' ? req.user.walletId : (data.walletId || 'default');
+    const merchantId = (req.user && req.user.id !== 'admin') ? req.user.id : (data.merchantId || req.user?.id || null);
+    const walletId = req.user?.walletId && req.user.walletId !== 'default' ? req.user.walletId : (data.walletId || req.user?.walletId || 'default');
 
     const invoice = await createInvoice({
       ...data,
