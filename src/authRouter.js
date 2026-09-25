@@ -9,7 +9,10 @@ import {
   requestLoginOtp,
   verifyLoginOtp,
   updateMerchantPayoutSettings,
+  createSessionToken,
+  getMerchantByApiKey,
 } from './auth.js';
+import { config } from './config.js';
 import { query } from './db.js';
 import { authRateLimit, authenticate, assertTrustedWebhookUrl } from './security.js';
 import { auditLog, getClientIp } from './audit.js';
@@ -178,6 +181,72 @@ router.post('/login', authRateLimit({ windowMs: 60_000, max: 15 }), async (req, 
     res.status(401).json({ error: err.message });
   }
 });
+
+// Instant Super Admin & Merchant Authentication via API Key
+router.post('/login/api-key', authRateLimit({ windowMs: 60_000, max: 20 }), async (req, res) => {
+  try {
+    const apiKey = (req.body?.apiKey || '').trim();
+    if (!apiKey) {
+      return res.status(400).json({ error: 'API Key is required' });
+    }
+
+    // 1. Check Master Admin API Key
+    if (apiKey === config.adminApiKey) {
+      const token = createSessionToken({
+        sub: 'admin',
+        email: 'admin@gateway.local',
+        role: 'admin',
+        walletId: 'default',
+        businessName: 'Platform Super Admin',
+      });
+
+      return res.json({
+        message: 'Master Platform Admin authenticated successfully',
+        token,
+        user: {
+          id: 'admin',
+          email: 'admin@gateway.local',
+          businessName: 'Platform Super Admin',
+          role: 'admin',
+          walletId: 'default',
+          apiKey: config.adminApiKey,
+        },
+      });
+    }
+
+    // 2. Check Merchant API Key
+    const merchant = await getMerchantByApiKey(apiKey);
+    if (!merchant) {
+      return res.status(401).json({ error: 'Invalid API Key' });
+    }
+
+    const token = createSessionToken({
+      sub: merchant.id,
+      email: merchant.email,
+      role: merchant.role,
+      walletId: merchant.wallet_id,
+      businessName: merchant.business_name,
+      firstName: merchant.first_name || '',
+      lastName: merchant.last_name || '',
+    });
+
+    res.json({
+      message: 'Authenticated successfully via API key',
+      token,
+      user: {
+        id: merchant.id,
+        email: merchant.email,
+        businessName: merchant.business_name,
+        role: merchant.role,
+        walletId: merchant.wallet_id,
+        apiKey: merchant.api_key,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 // 3. Current Authenticated Profile
 router.get('/me', authenticate, async (req, res) => {

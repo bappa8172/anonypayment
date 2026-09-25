@@ -219,6 +219,65 @@ document.getElementById('btn-resend-signup-otp')?.addEventListener('click', asyn
 // 2. SIGNIN FLOW (Request 2FA OTP → Verify OTP → /dashboard)
 // ─────────────────────────────────────────────────────────────
 
+// Toggle between Password Login and API Key Login
+const formLoginApiKey = document.getElementById('form-login-apikey');
+const btnToggleApiKeyLogin = document.getElementById('btn-toggle-apikey-login');
+const btnBackToPassword = document.getElementById('btn-back-to-password');
+
+btnToggleApiKeyLogin?.addEventListener('click', () => {
+  hideAlert(alertLogin);
+  if (formLoginStep1) formLoginStep1.style.display = 'none';
+  if (formLoginApiKey) formLoginApiKey.style.display = 'block';
+});
+
+btnBackToPassword?.addEventListener('click', () => {
+  hideAlert(alertLogin);
+  if (formLoginApiKey) formLoginApiKey.style.display = 'none';
+  if (formLoginStep1) formLoginStep1.style.display = 'block';
+});
+
+// API Key Submission Handler
+formLoginApiKey?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  hideAlert(alertLogin);
+
+  const apiKeyInput = document.getElementById('login-apikey-input');
+  const apiKey = apiKeyInput ? apiKeyInput.value.trim() : '';
+  if (!apiKey) {
+    showAlert(alertLogin, 'Please enter your API Key or Master Admin Key.');
+    return;
+  }
+
+  const btn = document.getElementById('btn-submit-apikey-login');
+  const orig = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Verifying API Key…';
+
+  try {
+    const res = await fetch('/auth/login/api-key', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ apiKey }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Invalid API Key');
+
+    localStorage.setItem('payrail_token', data.token);
+    if (data.user) localStorage.setItem('payrail_user', JSON.stringify(data.user));
+
+    showAlert(alertLogin, 'Authenticated! Redirecting to Dashboard...', 'success');
+    setTimeout(() => {
+      window.location.href = '/dashboard';
+    }, 600);
+  } catch (err) {
+    showAlert(alertLogin, err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = orig;
+  }
+});
+
 formLoginStep1?.addEventListener('submit', async (e) => {
   e.preventDefault();
   hideAlert(alertLogin);
@@ -229,9 +288,29 @@ formLoginStep1?.addEventListener('submit', async (e) => {
   const btn = document.getElementById('btn-submit-login');
   const originalText = btn.textContent;
   btn.disabled = true;
-  btn.textContent = 'Checking credentials…';
+  btn.textContent = 'Authenticating…';
 
   try {
+    // Master Super Admin logs in directly without requiring an external email OTP
+    if (email.toLowerCase() === 'admin@gateway.local') {
+      const res = await fetch('/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Invalid Master Admin credentials');
+
+      localStorage.setItem('payrail_token', data.token);
+      if (data.user) localStorage.setItem('payrail_user', JSON.stringify(data.user));
+
+      showAlert(alertLogin, 'Master Admin verified! Redirecting to Dashboard…', 'success');
+      setTimeout(() => {
+        window.location.href = '/dashboard';
+      }, 600);
+      return;
+    }
+
     const res = await fetch('/auth/login/request-otp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
