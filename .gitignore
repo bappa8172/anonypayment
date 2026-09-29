@@ -1,8 +1,33 @@
+# Dependencies
 node_modules/
+client/node_modules/
+
+# Environment Variables & Secrets
 .env
-npm-debug.log*
+.env.local
+.env.production
+.env.development
+
+# Production Builds
+dist/
+client/dist/
+
+# Database Files (SQLite live databases and WAL logs)
+data/*.db
 data/*.db*
 data/*.db-shm
 data/*.db-wal
-dist/
-client/dist/
+data/*.sqlite*
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# System & IDE Artifacts
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

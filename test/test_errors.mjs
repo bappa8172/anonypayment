@@ -19,13 +19,13 @@ console.log('--- Starting Error Handling & Data Leak Prevention Tests ---\n');
 const dummyPrivateKey = '0x4f3edf983ac636a65a842ce7c78d9aa706d3b113bce9c46f30d7d21715b23b1d';
 const dummyApiKey = 'pr_live_9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d';
 const dummyWebhookSec = 'whsec_998877665544332211aabbccddeeff00';
-const dummyPath = 'C:\\Users\\Bappa\\OneDrive\\Desktop\\project\\PAYMENT\\src\\secret.js';
+const dummyPath = 'C:\\server\\app\\payment\\src\\secret.js';
 
 const sampleErrorWithKey = `Broadcast error: transaction failed with key ${dummyPrivateKey} on path ${dummyPath}`;
 const redactedMsg = redactSensitiveData(sampleErrorWithKey);
 assert(!redactedMsg.includes(dummyPrivateKey), 'Private key must NOT be present in redacted string');
 assert(redactedMsg.includes('[REDACTED_PRIVATE_KEY]'), 'Must replace private key with [REDACTED_PRIVATE_KEY]');
-assert(!redactedMsg.includes('C:\\Users\\Bappa'), 'File system path must NOT be present in redacted string');
+assert(!redactedMsg.includes('C:\\server\\app'), 'File system path must NOT be present in redacted string');
 console.log('✅ Test 1: Private key & filesystem path successfully redacted');
 
 // 2. Verify API Key and Webhook Secret Redaction

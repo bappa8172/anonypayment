@@ -88,12 +88,16 @@ export function assertProductionConfiguration() {
   if (config.environment !== 'production') return;
 
   const required = [
-    ['DATABASE_URL', config.databaseUrl],
     ['ADMIN_API_KEY', config.adminApiKey],
     ['SESSION_SECRET', config.sessionSecret],
     ['WEBHOOK_SECRET', config.webhookSecret],
     ['ADMIN_PASSWORD', process.env.ADMIN_PASSWORD],
   ];
+
+  // If explicitly configured for PostgreSQL, enforce DATABASE_URL
+  if (process.env.USE_POSTGRES === 'true') {
+    required.push(['DATABASE_URL', config.databaseUrl]);
+  }
 
   const missing = required
     .filter(([, value]) => !value)

@@ -2,6 +2,7 @@ import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { assertProductionConfiguration, config } from './config.js';
 import { logger } from './logger.js';
@@ -111,18 +112,6 @@ app.use('/v1', basicRateLimit({ max: 300 }));
 app.use('/admin', adminRouter);
 app.use('/v1', publicRouter);
 
-// Payment link resolution: /link/:code -> redirects to frontend checkout on port 5173
-const frontendUrl = config.frontendUrl || process.env.FRONTEND_URL || 'http://localhost:5173';
-app.get('/link/:code', (req, res) => {
-  res.redirect(`${frontendUrl}/pay?link=${encodeURIComponent(req.params.code)}`);
-});
-
-// UI Route Redirects: Any browser visiting UI paths on port 3000 is forwarded to Vite frontend on 5173
-app.get(['/dashboard', '/pay', '/login', '/signup', '/flow-demo', '/demo'], (req, res) => {
-  const query = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
-  res.redirect(`${frontendUrl}${req.path}${query}`);
-});
-
 // ============================================================
 // HEALTH CHECK — Minimal info leak
 // ============================================================
@@ -133,26 +122,71 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Root Endpoint: Redirect browsers to Vite frontend, or return Headless Gateway API info to API clients
-app.get('/', (req, res) => {
-  if (req.accepts('html') && !req.accepts('json')) {
-    return res.redirect(frontendUrl);
+// ============================================================
+// FRONTEND SERVING & SPA FALLBACK (Production & Embedded UI)
+// ============================================================
+const clientDistPath = path.join(__dirname, '..', 'client', 'dist');
+const hasClientDist = fs.existsSync(clientDistPath);
+const frontendUrl = config.frontendUrl || process.env.FRONTEND_URL || 'http://localhost:5173';
+
+// Payment link resolution: /link/:code -> redirects to checkout
+app.get('/link/:code', (req, res) => {
+  if (hasClientDist) {
+    return res.redirect(`/pay?link=${encodeURIComponent(req.params.code)}`);
   }
-  res.json({
-    name: 'AnonyGateway Crypto API',
-    status: 'online',
-    version: '1.0.0',
-    network: config.networkMode,
-    frontend: frontendUrl,
-    endpoints: {
-      health: '/health',
-      auth: '/auth',
-      merchant: '/v1/merchant',
-      public: '/v1',
-      admin: '/admin',
-    },
-  });
+  return res.redirect(`${frontendUrl}/pay?link=${encodeURIComponent(req.params.code)}`);
 });
+
+// Root API Endpoint (for JSON API clients)
+app.get('/', (req, res, next) => {
+  if (req.accepts('json') && !req.accepts('html')) {
+    return res.json({
+      name: 'AnonyGateway Crypto API',
+      status: 'online',
+      version: '1.0.0',
+      network: config.networkMode,
+      endpoints: {
+        health: '/health',
+        auth: '/auth',
+        merchant: '/v1/merchant',
+        public: '/v1',
+        admin: '/admin',
+      },
+    });
+  }
+  next();
+});
+
+if (hasClientDist) {
+  // Serve compiled static assets (JS, CSS, images, fonts)
+  app.use(express.static(clientDistPath));
+
+  // SPA fallback for all frontend routes (excluding API prefixes)
+  app.get('*', (req, res, next) => {
+    if (
+      req.path.startsWith('/v1') ||
+      req.path.startsWith('/admin') ||
+      req.path.startsWith('/auth') ||
+      req.path.startsWith('/health')
+    ) {
+      return next();
+    }
+    if (req.accepts('html')) {
+      return res.sendFile(path.join(clientDistPath, 'index.html'));
+    }
+    next();
+  });
+} else {
+  // Development fallback when frontend is running via Vite on separate port
+  app.get(['/dashboard', '/pay', '/login', '/signup', '/flow-demo', '/demo'], (req, res) => {
+    const query = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
+    res.redirect(`${frontendUrl}${req.path}${query}`);
+  });
+
+  app.get('/', (req, res) => {
+    res.redirect(frontendUrl);
+  });
+}
 
 // ============================================================
 // 404 HANDLER FOR UNMATCHED ROUTES

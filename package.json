@@ -4,10 +4,11 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently -n \"BACKEND,FRONTEND\" -c \"cyan,magenta\" \"node src/index.js\" \"npm --prefix client run dev\"",
-    "start": "concurrently -n \"BACKEND,FRONTEND\" -c \"cyan,magenta\" \"node src/index.js\" \"npm --prefix client run dev\"",
+    "start": "node src/index.js",
     "server": "node src/index.js",
     "client": "npm --prefix client run dev",
     "build": "npm --prefix client run build",
+    "postinstall": "npm --prefix client install",
     "test": "node --test"
   },
   "dependencies": {
