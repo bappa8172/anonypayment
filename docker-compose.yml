@@ -1,38 +1,33 @@
 services:
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: anonygateway
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "3000:3000"
+    volumes:
+      # Persist SQLite database, balances, and audit logs on the host
+      - ./data:/app/data
+
+  # Optional PostgreSQL container if you prefer PostgreSQL over SQLite
+  # To enable: set DATABASE_URL=postgres://gateway:dbpassword@postgres:5432/gateway in .env
+  # and run: docker compose --profile postgres up -d
   postgres:
-    image: postgres:16
+    profiles: ["postgres"]
+    image: postgres:16-alpine
+    container_name: anonygateway-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_USER: gateway
-      # Development-only fallback. Set a unique secret via POSTGRES_PASSWORD
-      # before deploying this compose file anywhere shared.
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gateway}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gateway_secure_password_2026}
       POSTGRES_DB: gateway
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./sql/schema.sql:/docker-entrypoint-initdb.d/schema.sql
 
-  bsc:
-    image: ghcr.io/bnb-chain/bsc:latest
-    command:
-      - --http
-      - --http.addr=0.0.0.0
-      - --http.port=8545
-      - --http.api=eth,net,web3
-      - --http.vhosts=*
-      - --syncmode=snap
-    volumes:
-      - bscdata:/data
-      - ./bsc/config:/bsc/config:ro
-
-  gateway:
-    build: .
-    env_file: .env
-    depends_on:
-      - postgres
-      - bsc
-    ports:
-      - "3000:3000"
-
 volumes:
   pgdata:
-  bscdata:
