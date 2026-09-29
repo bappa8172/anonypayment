@@ -18,7 +18,7 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
-# Install curl for healthcheck & build tools for native C++ addons (sqlite3)
+# Install curl & native compilation tools for C++ addons (sqlite3)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     python3 \
@@ -27,9 +27,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Install production dependencies and build native bindings
+# Install production dependencies and rebuild sqlite3 from source to match system glibc
 COPY package*.json ./
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev && npm rebuild sqlite3 --build-from-source
 
 # Copy application source & database schemas
 COPY src/ ./src/
