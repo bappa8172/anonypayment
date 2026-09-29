@@ -280,6 +280,7 @@ export async function withdrawCrypto({
     // Refund balance if blockchain broadcast failed
     logger.error({ err: err.message }, 'Blockchain broadcast failed, refunding wallet balance');
     await creditWalletBalance(walletId, currency, amountUnits, 'REFUND', null, `Refund failed withdrawal: ${err.message}`);
+    throw err;
   }
 }
 

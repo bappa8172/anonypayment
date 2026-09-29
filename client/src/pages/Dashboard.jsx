@@ -422,7 +422,14 @@ export default function Dashboard() {
       }, 2000);
     } catch (err) {
       const errMsg = err.message || '';
-      if (errMsg.includes('insufficient token balance') || errMsg.includes('insufficient native balance')) {
+      const isLiquidity =
+        errMsg.toLowerCase().includes('insufficient token balance') ||
+        errMsg.toLowerCase().includes('insufficient native balance') ||
+        errMsg.toLowerCase().includes('insufficient') ||
+        err.data?.code === 'INSUFFICIENT_FUNDS' ||
+        err.data?.code === 'INSUFFICIENT_TREASURY_LIQUIDITY';
+
+      if (isLiquidity) {
         setWithdrawStatus({
           type: 'error',
           isLiquidityNotice: true,

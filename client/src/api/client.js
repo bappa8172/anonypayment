@@ -96,10 +96,13 @@ export async function apiFetch(endpoint, options = {}) {
 
   const contentType = res.headers.get('content-type') || '';
   let data = null;
-  if (contentType.includes('application/json')) {
-    data = await res.json();
-  } else {
-    data = await res.text();
+  const rawText = await res.text();
+  if (rawText && rawText.trim()) {
+    try {
+      data = JSON.parse(rawText);
+    } catch {
+      data = rawText;
+    }
   }
 
   if (!res.ok) {
