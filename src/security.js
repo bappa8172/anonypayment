@@ -243,6 +243,7 @@ export function assertTrustedWebhookUrl(value) {
       /^10\./,
       /^172\.(1[6-9]|2\d|3[01])\./,
       /^192\.168\./,
+      /^169\.254\./,
       /^0\.0\.0\.0$/,
       /^::1$/,
       /^fc00:/,
@@ -270,7 +271,7 @@ export function assertTrustedWebhookUrl(value) {
     }
   }
 
-  if (!config.trustedWebhookHosts.some(allowed => allowed === '*' || hostname === allowed || hostname.endsWith(`.${allowed}`))) {
+  if (config.trustedWebhookHosts.length > 0 && !config.trustedWebhookHosts.some(allowed => allowed === '*' || hostname === allowed || hostname.endsWith(`.${allowed}`))) {
     throw new BadRequestError(`webhookUrl host "${hostname}" is not in WEBHOOK_ALLOWED_HOSTS allowlist`);
   }
 }
