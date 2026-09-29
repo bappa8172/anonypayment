@@ -3,6 +3,7 @@ import { config } from './config.js';
 import { verifySessionToken, getMerchantByApiKey, getMerchantById } from './auth.js';
 import { logger } from './logger.js';
 import { query } from './db.js';
+import { BadRequestError } from './errors.js';
 
 // ============================================================
 // GLOBAL RATE LIMITER — Flood protection for entire app
@@ -223,46 +224,54 @@ export function assertTrustedWebhookUrl(value) {
   try {
     url = new URL(value);
   } catch {
-    throw new Error('webhookUrl must be a valid URL');
+    throw new BadRequestError('webhookUrl must be a valid URL');
   }
 
-  // Block internal/private address ranges — prevent SSRF
-  const hostname = url.hostname.toLowerCase();
-  const blockedPatterns = [
-    /^localhost$/,
-    /^127\./,
-    /^10\./,
-    /^172\.(1[6-9]|2\d|3[01])\./,
-    /^192\.168\./,
-    /^0\.0\.0\.0$/,
-    /^::1$/,
-    /^fc00:/,
-    /^fd[0-9a-f]{2}:/,
-    /\.local$/,
-    /\.internal$/,
-  ];
-  for (const pattern of blockedPatterns) {
-    if (pattern.test(hostname)) {
-      throw new Error('webhookUrl must not point to a private or local network address');
-    }
-  }
-
-  // Allow wildcard in development only
+  // Allow wildcard or development mode
   if (config.environment === 'development' || config.trustedWebhookHosts.includes('*')) {
     return;
   }
 
-  if (url.protocol !== 'https:') {
-    throw new Error('webhookUrl must use HTTPS');
+  const hostname = url.hostname.toLowerCase();
+
+  // Allow localhost/private IPs if explicitly in trustedWebhookHosts
+  const allowLocal = config.trustedWebhookHosts.includes('localhost') || config.trustedWebhookHosts.includes('127.0.0.1');
+  if (!allowLocal) {
+    const blockedPatterns = [
+      /^localhost$/,
+      /^127\./,
+      /^10\./,
+      /^172\.(1[6-9]|2\d|3[01])\./,
+      /^192\.168\./,
+      /^0\.0\.0\.0$/,
+      /^::1$/,
+      /^fc00:/,
+      /^fd[0-9a-f]{2}:/,
+      /\.local$/,
+      /\.internal$/,
+    ];
+    for (const pattern of blockedPatterns) {
+      if (pattern.test(hostname)) {
+        throw new BadRequestError('webhookUrl must not point to a private or local network address');
+      }
+    }
   }
+
   if (url.username || url.password) {
-    throw new Error('webhookUrl must not contain embedded credentials');
+    throw new BadRequestError('webhookUrl must not contain embedded credentials');
   }
-  if (url.port && url.port !== '443') {
-    throw new Error('webhookUrl must not use a non-standard port');
+
+  if (process.env.STRICT_SECURITY === 'true') {
+    if (url.protocol !== 'https:') {
+      throw new BadRequestError('webhookUrl must use HTTPS');
+    }
+    if (url.port && url.port !== '443') {
+      throw new BadRequestError('webhookUrl must not use a non-standard port');
+    }
   }
-  if (!config.trustedWebhookHosts.some(allowed => hostname === allowed || hostname.endsWith(`.${allowed}`))) {
-    throw new Error('webhookUrl host is not in WEBHOOK_ALLOWED_HOSTS allowlist');
+
+  if (!config.trustedWebhookHosts.some(allowed => allowed === '*' || hostname === allowed || hostname.endsWith(`.${allowed}`))) {
+    throw new BadRequestError(`webhookUrl host "${hostname}" is not in WEBHOOK_ALLOWED_HOSTS allowlist`);
   }
 }
 
