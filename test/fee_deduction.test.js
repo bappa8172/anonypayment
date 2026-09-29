@@ -1,19 +1,32 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+process.env.SQLITE_DB_PATH = path.join(__dirname, '..', 'data', 'test_gateway.db');
+
 import { initDb, query } from '../src/db.js';
+import { registerMerchant } from '../src/auth.js';
 import { createInvoice, getInvoice, recordEvmPayment } from '../src/invoices.js';
 import { getWalletBalances } from '../src/wallet.js';
 
 test('1% Anonymous Platform Fee Suite: Merchant invoice confirmation distributes 99% net to merchant and 1% fee to superadmin', async () => {
   await initDb();
 
-  const merchantId = `mch_fee_test_${Date.now()}`;
-  const merchantWalletId = `wallet_${merchantId}`;
+  const { user: merchant } = await registerMerchant({
+    email: `mch_fee_test_${Date.now()}@fee-test.io`,
+    businessName: 'Fee Test Corp',
+    password: 'Password123!',
+  });
+  const merchantId = merchant.id;
+  const merchantWalletId = merchant.walletId;
   const superadminWalletId = 'default';
 
   // 1. Create a 1000 USDT invoice created by merchant
   const invoice = await createInvoice({
     merchantId,
+    walletId: merchantWalletId,
     currency: 'USDT_BSC',
     amount: '1000.00',
     description: 'E-Commerce Order #8812',
@@ -71,11 +84,17 @@ test('1% Anonymous Platform Fee Suite: Merchant invoice confirmation distributes
 test('1% Anonymous Platform Fee Suite: TRON (USDT TRC-20) 6-decimal fee calculation', async () => {
   await initDb();
 
-  const merchantId = `mch_tron_test_${Date.now()}`;
-  const merchantWalletId = `wallet_${merchantId}`;
+  const { user: merchant } = await registerMerchant({
+    email: `mch_tron_test_${Date.now()}@fee-test.io`,
+    businessName: 'Tron Merchant Corp',
+    password: 'Password123!',
+  });
+  const merchantId = merchant.id;
+  const merchantWalletId = merchant.walletId;
 
   const invoice = await createInvoice({
     merchantId,
+    walletId: merchantWalletId,
     currency: 'USDT_TRC20',
     amount: '500.00',
     description: 'TRC-20 Invoice',
@@ -102,11 +121,17 @@ test('1% Anonymous Platform Fee Suite: TRON (USDT TRC-20) 6-decimal fee calculat
 test('1% Anonymous Platform Fee Suite: Bitcoin (BTC) 8-decimal Satoshi fee calculation', async () => {
   await initDb();
 
-  const merchantId = `mch_btc_test_${Date.now()}`;
-  const merchantWalletId = `wallet_${merchantId}`;
+  const { user: merchant } = await registerMerchant({
+    email: `mch_btc_test_${Date.now()}@fee-test.io`,
+    businessName: 'BTC Merchant Corp',
+    password: 'Password123!',
+  });
+  const merchantId = merchant.id;
+  const merchantWalletId = merchant.walletId;
 
   const invoice = await createInvoice({
     merchantId,
+    walletId: merchantWalletId,
     currency: 'BTC',
     amount: '1.00000000', // 1 BTC = 100,000,000 Satoshis
     description: 'BTC Invoice',
