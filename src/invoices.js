@@ -39,6 +39,62 @@ export async function createInvoice({
     ? walletId 
     : (merchantId && merchantId !== 'admin' ? `wallet_${merchantId}` : 'default');
 
+  // Idempotency: if finalOrderId is provided, return existing pending unexpired invoice
+  if (finalOrderId) {
+    let checkQ = `SELECT * FROM invoices WHERE order_id = $1 AND status = 'pending'`;
+    const checkParams = [finalOrderId];
+    if (finalCustomerEmail) {
+      checkQ += ` AND customer_email = $2`;
+      checkParams.push(finalCustomerEmail);
+    } else {
+      checkQ += ` AND customer_email IS NULL`;
+    }
+    if (merchantId) {
+      checkQ += ` AND merchant_id = $${checkParams.length + 1}`;
+      checkParams.push(merchantId);
+    }
+    checkQ += ` ORDER BY created_at DESC LIMIT 1`;
+
+    const existingRes = await query(checkQ, checkParams);
+    if (existingRes.rows.length > 0) {
+      const existing = existingRes.rows[0];
+      const expTime = new Date(existing.expires_at).getTime();
+      if (!isNaN(expTime) && expTime > Date.now()) {
+        const existingAsset = getAsset(existing.currency);
+        return {
+          id: existing.id,
+          address: existing.address,
+          amount: existing.amount,
+          amount_units: existing.amount_units,
+          amountUnits: existing.amount_units,
+          currency: existing.currency,
+          symbol: existingAsset.symbol,
+          name: existingAsset.name,
+          chain: existingAsset.chain,
+          chainId: existingAsset.chainId,
+          isNative: existingAsset.isNative,
+          tokenContract: existing.token_contract,
+          confirmations_required: existing.confirmations_required,
+          confirmationsRequired: existing.confirmations_required,
+          merchant_id: existing.merchant_id,
+          merchantId: existing.merchant_id,
+          wallet_id: existing.wallet_id,
+          walletId: existing.wallet_id,
+          customerEmail: existing.customer_email,
+          customerName: existing.customer_name,
+          orderId: existing.order_id,
+          description: existing.description,
+          expiresAt: existing.expires_at,
+          expiresInSeconds: Math.max(0, Math.floor((expTime - Date.now()) / 1000)),
+          serverTime: new Date().toISOString(),
+          checkoutUrl: `${config.publicUrl || config.frontendUrl}/pay?invoice=${existing.id}`,
+          explorerTx: existingAsset.explorerTx,
+          explorerAddress: `${existingAsset.explorerAddress}${existing.address}`,
+        };
+      }
+    }
+  }
+
   let address;
   let derivationIndex;
   let confirmationsRequired = 2;
@@ -101,6 +157,10 @@ export async function createInvoice({
     ]
   );
 
+  const nowMs = Date.now();
+  const expMs = new Date(expiresAt).getTime();
+  const expiresInSeconds = Math.max(0, Math.floor((expMs - nowMs) / 1000));
+
   const invoiceResult = {
     id,
     address,
@@ -125,6 +185,9 @@ export async function createInvoice({
     orderId: finalOrderId,
     description: finalDescription,
     expiresAt,
+    expiresInSeconds,
+    serverTime: new Date().toISOString(),
+    checkoutUrl: `${config.publicUrl || config.frontendUrl}/pay?invoice=${id}`,
     explorerTx: asset.explorerTx,
     explorerAddress: `${asset.explorerAddress}${address}`,
   };
@@ -158,7 +221,16 @@ export async function getInvoice(id) {
     ) t ON t.invoice_id = i.id
     WHERE i.id = $1
   `, [id]);
-  return res.rows[0];
+  const row = res.rows[0];
+  if (!row) return undefined;
+  if (row.status === 'pending' && row.expires_at) {
+    const expTime = new Date(row.expires_at).getTime();
+    if (!isNaN(expTime) && expTime <= Date.now()) {
+      row.status = 'expired';
+      query("UPDATE invoices SET status = 'expired' WHERE id = $1 AND status = 'pending'", [id]).catch(() => {});
+    }
+  }
+  return row;
 }
 
 export async function listInvoices({ limit = 50, status = null, merchantId = null } = {}) {
@@ -350,7 +422,7 @@ export async function recordEvmPayment(invoice, { txid, amountUnits, confirmatio
 }
 
 export async function expireInvoices() {
-  await query(`UPDATE invoices SET status = 'expired' WHERE status = 'pending' AND expires_at <= datetime('now')`);
+  await query(`UPDATE invoices SET status = 'expired' WHERE status = 'pending' AND (datetime(expires_at) <= datetime('now') OR expires_at <= datetime('now'))`);
 }
 
 export async function updateInvoiceCustomerEmail(id, customerEmail, customerName = null) {
@@ -409,6 +481,11 @@ export function publicInvoice(invoice) {
       ? 'Bitcoin Network'
       : (asset.name || 'BSC Network');
 
+  const nowMs = Date.now();
+  const expMs = invoice.expires_at ? new Date(invoice.expires_at).getTime() : 0;
+  const expiresInSeconds = expMs > 0 ? Math.max(0, Math.floor((expMs - nowMs) / 1000)) : 0;
+  const isExpired = invoice.status === 'expired' || (expMs > 0 && expMs <= nowMs);
+
   return {
     id: invoice.id,
     currency: invoice.currency,
@@ -420,12 +497,14 @@ export function publicInvoice(invoice) {
     isNative: asset.isNative,
     address: invoice.address,
     amount: invoice.amount,
-    status: invoice.status,
+    status: isExpired ? 'expired' : invoice.status,
     customerEmail: invoice.customer_email || null,
     customerName: invoice.customer_name || null,
     orderId: invoice.order_id || null,
     description: invoice.description || null,
     expiresAt: invoice.expires_at,
+    expiresInSeconds,
+    serverTime: new Date().toISOString(),
     paidAt: invoice.paid_at,
     confirmedAt: invoice.confirmed_at,
     txid: invoice.txid,
@@ -436,6 +515,7 @@ export function publicInvoice(invoice) {
     feeAmount: invoice.fee_amount || null,
     netAmount: invoice.net_amount || null,
     paymentUri,
+    checkoutUrl: `${config.publicUrl || config.frontendUrl}/pay?invoice=${invoice.id}`,
     explorerTx: invoice.txid ? `${asset.explorerTx}${invoice.txid}` : null,
     explorerAddress: `${asset.explorerAddress}${invoice.address}`,
   };

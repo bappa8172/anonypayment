@@ -116,16 +116,7 @@ router.get('/payment-links/:code/checkout', async (req, res, next) => {
     const link = await getPaymentLinkByCode(req.params.code);
     if (!link) return res.status(404).redirect(`${frontendUrl}/pay?error=link_not_found`);
 
-    const invoice = await createInvoice({
-      currency: link.currency,
-      amount: link.amount,
-      merchantId: link.merchant_id || null,
-      walletId: link.wallet_id || 'default',
-      description: link.title,
-      orderId: `LINK-${link.code}`,
-      metadata: { paymentLinkCode: link.code, title: link.title },
-    });
-    return res.redirect(`${frontendUrl}/pay?invoice=${invoice.id}`);
+    return res.redirect(`${frontendUrl}/pay?link=${encodeURIComponent(link.code)}`);
   } catch (error) {
     return next(error);
   }

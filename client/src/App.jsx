@@ -26,6 +26,7 @@ export default function App() {
 
           {/* Checkout & Payment Page */}
           <Route path="/pay" element={<Pay />} />
+          <Route path="/pay/:id" element={<Pay />} />
           <Route path="/link/:code" element={<LinkRedirect />} />
 
           {/* Merchant Dashboard */}

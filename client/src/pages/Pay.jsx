@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, useParams, Link } from 'react-router-dom';
 import {
   Copy,
   Check,
@@ -20,7 +20,8 @@ import BrandLogo from '../components/BrandLogo';
 
 export default function Pay() {
   const [searchParams] = useSearchParams();
-  const invoiceParam = searchParams.get('invoice') || searchParams.get('invoiceId');
+  const { id: pathId } = useParams();
+  const invoiceParam = searchParams.get('invoice') || searchParams.get('invoiceId') || pathId;
   const linkParam = searchParams.get('link') || searchParams.get('code');
 
   const [invoice, setInvoice] = useState(null);
@@ -41,8 +42,9 @@ export default function Pay() {
   const [copiedAddress, setCopiedAddress] = useState(false);
   const [copiedAmount, setCopiedAmount] = useState(false);
 
-  // Time remaining
+  // Time remaining & local expiration state
   const [timeRemaining, setTimeRemaining] = useState('');
+  const [isTimeExpired, setIsTimeExpired] = useState(false);
 
   // Web3 state
   const [web3Status, setWeb3Status] = useState('');
@@ -113,30 +115,42 @@ export default function Pay() {
     return () => clearInterval(interval);
   }, [invoice?.id, invoice?.status]);
 
-  // Expiration Countdown
+  // Expiration Countdown (resilient to server/client clock skews)
   useEffect(() => {
-    if (!invoice?.expiresAt) return;
+    if (!invoice) return;
     if (invoice.status === 'confirmed' || invoice.status === 'paid' || invoice.status === 'expired') {
       return;
     }
 
-    const target = new Date(invoice.expiresAt).getTime();
+    const startClientMs = Date.now();
+    let totalSeconds = 0;
+
+    if (typeof invoice.expiresInSeconds === 'number') {
+      totalSeconds = invoice.expiresInSeconds;
+    } else if (invoice.expiresAt) {
+      const targetMs = new Date(invoice.expiresAt).getTime();
+      totalSeconds = Math.max(0, Math.floor((targetMs - startClientMs) / 1000));
+    }
+
     const updateCountdown = () => {
-      const now = Date.now();
-      const diff = target - now;
-      if (diff <= 0) {
+      const elapsed = Math.floor((Date.now() - startClientMs) / 1000);
+      const remaining = totalSeconds - elapsed;
+
+      if (remaining <= 0) {
         setTimeRemaining('Expired');
+        setIsTimeExpired(true);
       } else {
-        const mins = Math.floor(diff / 60000);
-        const secs = Math.floor((diff % 60000) / 1000);
+        const mins = Math.floor(remaining / 60);
+        const secs = remaining % 60;
         setTimeRemaining(`${mins}:${secs < 10 ? '0' : ''}${secs}`);
+        setIsTimeExpired(false);
       }
     };
 
     updateCountdown();
     const timer = setInterval(updateCountdown, 1000);
     return () => clearInterval(timer);
-  }, [invoice?.expiresAt, invoice?.status]);
+  }, [invoice?.id, invoice?.expiresAt, invoice?.expiresInSeconds, invoice?.status]);
 
   // Success redirect countdown
   useEffect(() => {
@@ -181,6 +195,32 @@ export default function Pay() {
     setLoading(true);
     setError(null);
     try {
+      // Check if session already has an active, unexpired invoice for this link
+      try {
+        const savedInvoiceId = sessionStorage.getItem(`payment_link_inv_${code}`);
+        if (savedInvoiceId) {
+          const existing = await publicApi.getInvoice(savedInvoiceId);
+          if (existing && existing.status === 'pending') {
+            const expMs = existing.expiresAt ? new Date(existing.expiresAt).getTime() : 0;
+            const validSecs = typeof existing.expiresInSeconds === 'number'
+              ? existing.expiresInSeconds
+              : (expMs - Date.now()) / 1000;
+            if (validSecs > 0) {
+              setInvoice(existing);
+              if (existing.customerEmail) setCustomerEmailInput(existing.customerEmail);
+              setEmailGateRequired(false);
+              setLoading(false);
+              const url = new URL(window.location.href);
+              url.searchParams.delete('link');
+              url.searchParams.delete('code');
+              url.searchParams.set('invoice', existing.id);
+              window.history.replaceState({}, '', url.pathname + url.search);
+              return;
+            }
+          }
+        }
+      } catch (_) {}
+
       const link = await publicApi.getPaymentLink(code);
       setPaymentLink(link);
       setEmailGateRequired(true); // Always ask email first on payment links!
@@ -209,6 +249,20 @@ export default function Pay() {
         setCustomerEmailInput(gateEmail.trim());
         setEmailGateRequired(false);
         setToast({ msg: `✉️ Invoice details emailed to ${gateEmail.trim()}!`, type: 'success' });
+
+        // Save invoice in session storage so page refreshes retain the same invoice & address
+        try {
+          sessionStorage.setItem(`payment_link_inv_${paymentLink.code}`, newInvoice.id);
+        } catch (_) {}
+
+        // Update URL to /pay?invoice=${newInvoice.id} so reload hits this exact invoice
+        try {
+          const url = new URL(window.location.href);
+          url.searchParams.delete('link');
+          url.searchParams.delete('code');
+          url.searchParams.set('invoice', newInvoice.id);
+          window.history.replaceState({}, '', url.pathname + url.search);
+        } catch (_) {}
       } else if (invoice) {
         // Register customer email to existing invoice
         await publicApi.updateCustomerEmail(invoice.id, gateEmail.trim(), gateName.trim());
@@ -222,6 +276,20 @@ export default function Pay() {
       setGateError(err.message || 'Failed to submit email. Please retry.');
     } finally {
       setGateSubmitting(false);
+    }
+  };
+
+  const handleRefreshInvoice = () => {
+    if (paymentLink?.code) {
+      try {
+        sessionStorage.removeItem(`payment_link_inv_${paymentLink.code}`);
+      } catch (_) {}
+      const url = new URL(window.location.href);
+      url.searchParams.delete('invoice');
+      url.searchParams.set('link', paymentLink.code);
+      window.location.href = url.pathname + url.search;
+    } else {
+      window.location.reload();
     }
   };
 
@@ -330,7 +398,7 @@ export default function Pay() {
 
   const isConfirmed = invoice?.status === 'confirmed';
   const isPaid = invoice?.status === 'paid';
-  const isExpired = invoice?.status === 'expired';
+  const isExpired = invoice?.status === 'expired' || isTimeExpired;
   const showSuccessScreen = isConfirmed || isPaid;
 
   return (
@@ -775,9 +843,9 @@ export default function Pay() {
                   boxShadow: isExpired ? 'none' : '0 0 8px #f59e0b',
                 }}
               />
-              <span style={{ fontSize: '0.86rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+              <span style={{ fontSize: '0.86rem', fontWeight: 600, color: isExpired ? '#fca5a5' : 'var(--text-muted)' }}>
                 {isExpired
-                  ? 'Invoice expired'
+                  ? 'Invoice expired — Do not send funds'
                   : 'Awaiting payment on BNB Smart Chain…'}
               </span>
             </div>
@@ -795,10 +863,32 @@ export default function Pay() {
               }}
             >
               <span>Expires in:</span>
-              <strong style={{ color: '#00e5ff', fontFamily: 'JetBrains Mono, monospace', fontSize: '0.96rem' }}>
-                {timeRemaining || '—:—'}
+              <strong style={{ color: isExpired ? '#ef4444' : '#00e5ff', fontFamily: 'JetBrains Mono, monospace', fontSize: '0.96rem' }}>
+                {timeRemaining || (isExpired ? 'Expired' : '—:—')}
               </strong>
             </div>
+
+            {/* If expired, provide quick restart button */}
+            {isExpired && (
+              <div style={{ marginTop: '14px' }}>
+                <button
+                  type="button"
+                  onClick={handleRefreshInvoice}
+                  className="btn btn-secondary btn-sm"
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    border: '1px solid rgba(239, 68, 68, 0.4)',
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    color: '#fca5a5',
+                    fontWeight: 600,
+                    borderRadius: '10px',
+                  }}
+                >
+                  🔄 Generate Fresh Invoice
+                </button>
+              </div>
+            )}
 
             {/* Fee Transparency Callout */}
             <div
