@@ -8,7 +8,6 @@
     "server": "node src/index.js",
     "client": "npm --prefix client run dev",
     "build": "npm --prefix client run build",
-    "postinstall": "npm --prefix client install",
     "test": "node --test"
   },
   "dependencies": {
