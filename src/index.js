@@ -27,39 +27,39 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isDev = config.environment !== 'production';
 
 // ============================================================
-// SECURITY HEADERS — Helmet with strict Content Security Policy
+// SECURITY HEADERS — Helmet with Content Security Policy
 // ============================================================
+const enforceHttps = process.env.ENFORCE_HTTPS === 'true';
+
 app.use(helmet({
-  // Content Security Policy — allow resources needed for dashboard & fonts
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'"],   // unsafe-inline needed for inline dashboard scripts
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
       styleSrc:  ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
-      imgSrc:    ["'self'", 'data:', 'https:'],    // data: needed for QR codes
-      connectSrc: ["'self'", ...(isDev ? ['http://localhost:*', 'ws://localhost:*'] : [])],
+      imgSrc:    ["'self'", 'data:', 'https:', 'blob:'],
+      connectSrc: ["'self'", 'http:', 'https:', 'ws:', 'wss:'],
       fontSrc:   ["'self'", 'data:', 'https://fonts.gstatic.com'],
       objectSrc: ["'none'"],
       frameSrc:  ["'none'"],
-      upgradeInsecureRequests: isDev ? null : [],
+      upgradeInsecureRequests: enforceHttps ? [] : null,
     },
   },
-  // Strict Transport Security — 1 year with subdomains
-  hsts: isDev ? false : {
+  hsts: enforceHttps ? {
     maxAge: 31536000,
     includeSubDomains: true,
     preload: true,
-  },
+  } : false,
   crossOriginEmbedderPolicy: false,
   crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
 
-// Permissions-Policy — disable all browser APIs not needed for a payment gateway
+// Permissions-Policy — disable unused browser APIs
 app.use((req, res, next) => {
-  res.setHeader('Permissions-Policy', 'geolocation=(), camera=(), microphone=(), payment=(), usb=(), magnetometer=()');
-  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('Permissions-Policy', 'geolocation=(), camera=(), microphone=(), usb=(), magnetometer=()');
+  res.setHeader('Referrer-Policy', 'no-referrer-when-downgrade');
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   next();
 });
 
