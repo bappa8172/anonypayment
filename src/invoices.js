@@ -1,5 +1,7 @@
 import { query } from './db.js';
 import { deriveAddress, initEVM } from './evm.js';
+import { initTron, deriveTronAddress } from './tron.js';
+import { initBTC, deriveBtcAddress } from './btcWallet.js';
 import { config } from './config.js';
 import { v4 as uuidv4 } from 'uuid';
 import { getAsset } from './assets.js';
@@ -33,18 +35,43 @@ export async function createInvoice({
   const finalCustomerName = customerName || (metadata && metadata.customerName) || null;
   const finalOrderId = orderId || (metadata && metadata.orderId) || null;
   const finalDescription = description || (metadata && metadata.description) || null;
+  const effectiveWalletId = (walletId && walletId !== 'default') 
+    ? walletId 
+    : (merchantId && merchantId !== 'admin' ? `wallet_${merchantId}` : 'default');
 
-  const evmInitialized = await initEVM();
-  if (!evmInitialized) throw new Error('EVM wallet could not be initialized');
+  let address;
+  let derivationIndex;
+  let confirmationsRequired = 2;
 
-  await query(`INSERT INTO settings (key, value) VALUES ('evm_next_index', '0') ON CONFLICT (key) DO NOTHING`);
-  const res = await query(`UPDATE settings SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT) WHERE key = 'evm_next_index' RETURNING value`);
-  const derivationIndex = parseInt(res.rows[0].value, 10) - 1;
-  const address = deriveAddress(derivationIndex);
+  if (asset.chain === 'tron') {
+    const tronInit = await initTron();
+    if (!tronInit) throw new Error('TRON wallet could not be initialized');
+    await query(`INSERT INTO settings (key, value) VALUES ('tron_next_index', '0') ON CONFLICT (key) DO NOTHING`);
+    const res = await query(`UPDATE settings SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT) WHERE key = 'tron_next_index' RETURNING value`);
+    derivationIndex = parseInt(res.rows[0].value, 10) - 1;
+    address = deriveTronAddress(derivationIndex);
+    confirmationsRequired = config.tron?.confirmations || 19;
+  } else if (asset.chain === 'btc') {
+    const btcInit = await initBTC();
+    if (!btcInit) throw new Error('Bitcoin wallet could not be initialized');
+    await query(`INSERT INTO settings (key, value) VALUES ('btc_next_index', '0') ON CONFLICT (key) DO NOTHING`);
+    const res = await query(`UPDATE settings SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT) WHERE key = 'btc_next_index' RETURNING value`);
+    derivationIndex = parseInt(res.rows[0].value, 10) - 1;
+    address = deriveBtcAddress(derivationIndex, 'segwit');
+    confirmationsRequired = config.btc?.confirmations || 1;
+  } else {
+    // EVM
+    const evmInitialized = await initEVM();
+    if (!evmInitialized) throw new Error('EVM wallet could not be initialized');
+    await query(`INSERT INTO settings (key, value) VALUES ('evm_next_index', '0') ON CONFLICT (key) DO NOTHING`);
+    const res = await query(`UPDATE settings SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT) WHERE key = 'evm_next_index' RETURNING value`);
+    derivationIndex = parseInt(res.rows[0].value, 10) - 1;
+    address = deriveAddress(derivationIndex);
+    confirmationsRequired = asset.isNative ? (asset.chain === 'sepolia' ? 2 : 2) : config.evm.confirmations;
+  }
+
   const normalizedAmount = normalizeAmount(amount, asset.decimals);
   const amountUnits = toBaseUnits(amount, asset.decimals).toString();
-
-  const confirmationsRequired = asset.isNative ? (asset.chain === 'sepolia' ? 2 : 2) : config.evm.confirmations;
 
   await query(
     `INSERT INTO invoices (
@@ -66,7 +93,7 @@ export async function createInvoice({
       asset.contract || null,
       derivationIndex,
       merchantId || null,
-      walletId || 'default',
+      effectiveWalletId,
       finalCustomerEmail,
       finalCustomerName,
       finalOrderId,
@@ -78,6 +105,8 @@ export async function createInvoice({
     id,
     address,
     amount: normalizedAmount,
+    amount_units: amountUnits,
+    amountUnits,
     currency: asset.currency,
     symbol: asset.symbol,
     name: asset.name,
@@ -85,8 +114,12 @@ export async function createInvoice({
     chainId: asset.chainId,
     isNative: asset.isNative,
     tokenContract: asset.contract,
+    confirmations_required: confirmationsRequired,
+    confirmationsRequired,
+    merchant_id: merchantId,
     merchantId,
-    walletId,
+    wallet_id: effectiveWalletId,
+    walletId: effectiveWalletId,
     customerEmail: finalCustomerEmail,
     customerName: finalCustomerName,
     orderId: finalOrderId,
@@ -178,7 +211,8 @@ export async function updateInvoiceStatus(id, status, txid = null, confirmations
 
 export async function recordEvmPayment(invoice, { txid, amountUnits, confirmations, raw }) {
   const asset = getAsset(invoice.currency);
-  const status = confirmations >= invoice.confirmations_required ? 'confirmed' : 'paid';
+  const reqConf = invoice.confirmations_required ?? invoice.confirmationsRequired ?? 12;
+  const status = confirmations >= reqConf ? 'confirmed' : 'paid';
 
   await query(
     `INSERT INTO transactions (id, invoice_id, txid, amount, amount_units, confirmations, status, raw, created_at, updated_at)
@@ -203,16 +237,74 @@ export async function recordEvmPayment(invoice, { txid, amountUnits, confirmatio
       // If newly confirmed, settle into merchant's isolated wallet
   if (status === 'confirmed' && previousStatus !== 'confirmed') {
     try {
-      const targetWalletId = invoice.wallet_id || 'default';
-      await creditWalletBalance(
-        targetWalletId,
-        invoice.currency,
-        amountUnits,
-        'INVOICE_SETTLEMENT',
-        txid,
-        `Settlement for invoice #${invoice.id.slice(0, 8)}`
+      // Resolve merchant wallet ID
+      let targetWalletId = invoice.wallet_id || invoice.walletId;
+      const mId = invoice.merchant_id || invoice.merchantId;
+      if (!targetWalletId || targetWalletId === 'default') {
+        if (mId && mId !== 'admin') {
+          targetWalletId = `wallet_${mId}`;
+        } else {
+          targetWalletId = 'default';
+        }
+      }
+
+      const totalUnits = BigInt(amountUnits);
+      // 1% platform processing fee (100 basis points)
+      const feeUnits = (totalUnits * 100n) / 10000n;
+      const netMerchantUnits = totalUnits - feeUnits;
+
+      const feeFormatted = fromBaseUnits(feeUnits.toString(), asset.decimals);
+      const netFormatted = fromBaseUnits(netMerchantUnits.toString(), asset.decimals);
+
+      // Record fee breakdown in invoice table
+      await query(
+        `UPDATE invoices SET fee_amount = $1, fee_units = $2, net_amount = $3, net_units = $4 WHERE id = $5`,
+        [feeFormatted, feeUnits.toString(), netFormatted, netMerchantUnits.toString(), invoice.id]
       );
-      logger.info({ invoiceId: invoice.id, walletId: targetWalletId, amountUnits: amountUnits.toString() }, 'Settled invoice payment into merchant wallet');
+
+      if (targetWalletId !== 'default' && feeUnits > 0n) {
+        // 1. Credit 99% net to merchant's wallet anonymously
+        await creditWalletBalance(
+          targetWalletId,
+          invoice.currency,
+          netMerchantUnits.toString(),
+          'INVOICE_SETTLEMENT',
+          txid,
+          `Settlement for invoice #${invoice.id.slice(0, 8)} (net of 1% platform fee)`
+        );
+
+        // 2. Credit 1% platform fee to Super Admin wallet anonymously
+        await creditWalletBalance(
+          'default',
+          invoice.currency,
+          feeUnits.toString(),
+          'PLATFORM_FEE',
+          txid,
+          `Platform fee (1%) for settlement #${invoice.id.slice(0, 8)}`
+        );
+
+        logger.info(
+          {
+            invoiceId: invoice.id,
+            merchantWalletId: targetWalletId,
+            netAmount: netFormatted,
+            feeAmount: feeFormatted,
+            currency: invoice.currency,
+          },
+          'Settled invoice payment: 99% net to merchant, 1% fee to superadmin wallet'
+        );
+      } else {
+        // Direct Super Admin invoice or zero fee: credit full amount to target wallet
+        await creditWalletBalance(
+          targetWalletId,
+          invoice.currency,
+          amountUnits.toString(),
+          'INVOICE_SETTLEMENT',
+          txid,
+          `Settlement for invoice #${invoice.id.slice(0, 8)}`
+        );
+        logger.info({ invoiceId: invoice.id, walletId: targetWalletId, amountUnits: amountUnits.toString() }, 'Settled invoice payment into wallet');
+      }
 
         // Dispatch automated emails to business owner and customer receipt
         try {
@@ -302,10 +394,20 @@ export function publicInvoice(invoice) {
   const asset = getAsset(invoice.currency);
 
   let paymentUri = `ethereum:${invoice.address}?value=${invoice.amount_units}`;
-  if (!asset.isNative && invoice.token_contract) {
+  if (asset.chain === 'btc') {
+    paymentUri = `bitcoin:${invoice.address}?amount=${invoice.amount}`;
+  } else if (asset.chain === 'tron') {
+    paymentUri = `tron:${invoice.address}`;
+  } else if (!asset.isNative && invoice.token_contract) {
     paymentUri = `ethereum:${invoice.token_contract}@${asset.chainId}/transfer?` +
       new URLSearchParams({ address: invoice.address, uint256: invoice.amount_units }).toString();
   }
+
+  const networkName = asset.chain === 'tron'
+    ? 'TRON Network (TRC-20)'
+    : asset.chain === 'btc'
+      ? 'Bitcoin Network'
+      : (asset.name || 'BSC Network');
 
   return {
     id: invoice.id,
@@ -314,6 +416,7 @@ export function publicInvoice(invoice) {
     name: asset.name,
     chain: asset.chain,
     chainId: asset.chainId,
+    network: networkName,
     isNative: asset.isNative,
     address: invoice.address,
     amount: invoice.amount,
@@ -329,6 +432,9 @@ export function publicInvoice(invoice) {
     confirmations: invoice.confirmations !== undefined ? invoice.confirmations : (invoice.status === 'confirmed' ? invoice.confirmations_required : (invoice.status === 'paid' ? 1 : 0)),
     confirmationsRequired: invoice.confirmations_required,
     tokenContract: invoice.token_contract,
+    feePercent: 1.0,
+    feeAmount: invoice.fee_amount || null,
+    netAmount: invoice.net_amount || null,
     paymentUri,
     explorerTx: invoice.txid ? `${asset.explorerTx}${invoice.txid}` : null,
     explorerAddress: `${asset.explorerAddress}${invoice.address}`,
@@ -349,10 +455,14 @@ export async function createPaymentLink({
   const id = uuidv4();
   const code = Math.random().toString(36).substring(2, 10).toUpperCase();
 
+  const effectiveWalletId = (walletId && walletId !== 'default')
+    ? walletId
+    : (merchantId && merchantId !== 'admin' ? `wallet_${merchantId}` : 'default');
+
   await query(
     `INSERT INTO payment_links (id, code, title, description, currency, amount, redirect_url, merchant_id, wallet_id, created_at)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, datetime('now'))`,
-    [id, code, title, description, asset.currency, normalizedAmount, redirectUrl, merchantId, walletId]
+    [id, code, title, description, asset.currency, normalizedAmount, redirectUrl, merchantId, effectiveWalletId]
   );
 
   return {
@@ -363,9 +473,10 @@ export async function createPaymentLink({
     currency: asset.currency,
     symbol: asset.symbol,
     amount: normalizedAmount,
+    feePercent: 1.0,
     redirectUrl,
     merchantId,
-    walletId,
+    walletId: effectiveWalletId,
   };
 }
 

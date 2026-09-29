@@ -27,7 +27,8 @@ export const config = {
     .filter(Boolean),
 
   treasuryPrivateKey: process.env.TREASURY_PRIVATE_KEY,
-  publicUrl: process.env.PUBLIC_URL || `http://localhost:${process.env.PORT || '3000'}`,
+  frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
+  publicUrl: process.env.PUBLIC_URL || process.env.FRONTEND_URL || 'http://localhost:5173',
 
   email: {
     enabled: process.env.SMTP_ENABLED !== 'false',
@@ -69,7 +70,18 @@ export const config = {
     rpcUrl: process.env.POLYGON_RPC_URL || 'https://polygon-bor-rpc.publicnode.com',
     chainId: 137,
     confirmations: 5,
-  }
+  },
+
+  tron: {
+    apiUrl: process.env.TRON_API_URL || 'https://api.trongrid.io',
+    usdtContract: process.env.USDT_TRC20_CONTRACT || 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
+    confirmations: parseInt(process.env.TRON_CONFIRMATIONS || '19', 10),
+  },
+
+  btc: {
+    apiUrl: process.env.BTC_MEMPOOL_API || 'https://mempool.space/api',
+    confirmations: parseInt(process.env.BTC_CONFIRMATIONS || '1', 10),
+  },
 };
 
 export function assertProductionConfiguration() {

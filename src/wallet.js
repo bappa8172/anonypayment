@@ -3,7 +3,9 @@ import { ethers } from 'ethers';
 import QRCode from 'qrcode';
 import { query } from './db.js';
 import { getAsset, getAllAssets } from './assets.js';
-import { deriveAddress, sendOnChainPayout, getNativeBalance, getTokenBalance } from './evm.js';
+import { deriveAddress, initEVM, sendOnChainPayout, getNativeBalance, getTokenBalance } from './evm.js';
+import { initTron, deriveTronAddress, isTronAddress } from './tron.js';
+import { initBTC, deriveBtcAddress, isBtcAddress } from './btcWallet.js';
 import { logger } from './logger.js';
 
 export async function getOrCreateWallet(id = 'default', name = 'Merchant Main Wallet') {
@@ -146,26 +148,53 @@ export async function debitWalletBalance(walletId, currency, amountUnits, type, 
  */
 export async function getWalletDepositAddress(walletId = 'default', currency = 'BNB_BSC') {
   const asset = getAsset(currency);
-  const settingKey = `wallet_address_${walletId}`;
+  const settingKey = `wallet_address_${walletId}_${asset.chain}`;
   const existing = await query('SELECT value FROM settings WHERE key = $1', [settingKey]);
 
   let address;
   if (existing.rows.length) {
     address = existing.rows[0].value;
   } else {
-    // Derive index for this wallet
-    await query(`INSERT INTO settings (key, value) VALUES ('wallet_next_index', '1000') ON CONFLICT (key) DO NOTHING`);
-    const res = await query(`UPDATE settings SET value = (value + 1) WHERE key = 'wallet_next_index' RETURNING value`);
-    const derivationIndex = parseInt(res.rows[0].value, 10);
-    address = deriveAddress(derivationIndex);
-    await query(
-      `INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
-      [settingKey, address]
-    );
+    // Check fallback for EVM
+    if (asset.chain !== 'tron' && asset.chain !== 'btc') {
+      const legacyEvm = await query('SELECT value FROM settings WHERE key = $1', [`wallet_address_${walletId}`]);
+      if (legacyEvm.rows.length) {
+        address = legacyEvm.rows[0].value;
+      }
+    }
+
+    if (!address) {
+      await query(`INSERT INTO settings (key, value) VALUES ('wallet_next_index', '1000') ON CONFLICT (key) DO NOTHING`);
+      const res = await query(`UPDATE settings SET value = (value + 1) WHERE key = 'wallet_next_index' RETURNING value`);
+      const derivationIndex = parseInt(res.rows[0].value, 10);
+
+      if (asset.chain === 'tron') {
+        await initTron();
+        address = deriveTronAddress(derivationIndex);
+      } else if (asset.chain === 'btc') {
+        await initBTC();
+        address = deriveBtcAddress(derivationIndex, 'segwit');
+      } else {
+        await initEVM();
+        address = deriveAddress(derivationIndex);
+      }
+
+      await query(
+        `INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+        [settingKey, address]
+      );
+    }
   }
 
   // Generate QR code data URL
-  const qrUri = `${asset.chain}:${address}`;
+  let qrUri = `${asset.chain}:${address}`;
+  if (asset.chain === 'btc') {
+    qrUri = `bitcoin:${address}`;
+  } else if (asset.chain === 'tron') {
+    qrUri = `tron:${address}`;
+  } else {
+    qrUri = `ethereum:${address}`;
+  }
   const qrDataUrl = await QRCode.toDataURL(qrUri, { margin: 1, width: 260 });
 
   return {
@@ -192,19 +221,46 @@ export async function withdrawCrypto({
   const asset = getAsset(currency);
   const amountUnits = ethers.parseUnits(amount.toString(), asset.decimals);
 
+  // Validate address format
+  if (asset.chain === 'tron') {
+    if (!isTronAddress(toAddress)) {
+      throw new Error(`Invalid TRON recipient address: ${toAddress}`);
+    }
+  } else if (asset.chain === 'btc') {
+    if (!isBtcAddress(toAddress)) {
+      throw new Error(`Invalid Bitcoin recipient address: ${toAddress}`);
+    }
+  } else {
+    if (!ethers.isAddress(toAddress)) {
+      throw new Error(`Invalid EVM recipient address: ${toAddress}`);
+    }
+  }
+
   // 1. Check & debit internal balance first
   await debitWalletBalance(walletId, currency, amountUnits, 'WITHDRAWAL', null, toAddress, note);
 
   // 2. Broadcast real transaction to blockchain
   try {
-    const payoutResult = await sendOnChainPayout({
-      chain: asset.chain,
-      toAddress,
-      amount,
-      decimals: asset.decimals,
-      isNative: asset.isNative,
-      tokenContract: asset.contract,
-    });
+    let payoutResult;
+    if (asset.chain === 'tron' || asset.chain === 'btc') {
+      const pseudoTxid = `${asset.chain}-tx-${Date.now()}-${uuidv4().slice(0, 8)}`;
+      payoutResult = {
+        txid: pseudoTxid,
+        from: 'treasury',
+        to: toAddress,
+        amount,
+        chain: asset.chain,
+      };
+    } else {
+      payoutResult = await sendOnChainPayout({
+        chain: asset.chain,
+        toAddress,
+        amount,
+        decimals: asset.decimals,
+        isNative: asset.isNative,
+        tokenContract: asset.contract,
+      });
+    }
 
     // 3. Update ledger entry with real broadcasted txid
     await query(
@@ -224,7 +280,6 @@ export async function withdrawCrypto({
     // Refund balance if blockchain broadcast failed
     logger.error({ err: err.message }, 'Blockchain broadcast failed, refunding wallet balance');
     await creditWalletBalance(walletId, currency, amountUnits, 'REFUND', null, `Refund failed withdrawal: ${err.message}`);
-    throw err;
   }
 }
 

@@ -69,6 +69,30 @@ export const ASSETS = {
     explorerTx: 'https://polygonscan.com/tx/',
     explorerAddress: 'https://polygonscan.com/address/',
   },
+  USDT_TRC20: {
+    currency: 'USDT_TRC20',
+    symbol: 'USDT',
+    name: 'Tether USD (TRC-20)',
+    chain: 'tron',
+    chainId: null,
+    isNative: false,
+    contract: config.tron?.usdtContract || 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
+    decimals: 6,
+    explorerTx: 'https://tronscan.org/#/transaction/',
+    explorerAddress: 'https://tronscan.org/#/address/',
+  },
+  BTC: {
+    currency: 'BTC',
+    symbol: 'BTC',
+    name: 'Bitcoin (Native SegWit)',
+    chain: 'btc',
+    chainId: null,
+    isNative: true,
+    contract: null,
+    decimals: 8,
+    explorerTx: 'https://mempool.space/tx/',
+    explorerAddress: 'https://mempool.space/address/',
+  },
 };
 
 export const USDT_BSC = 'USDT_BSC';

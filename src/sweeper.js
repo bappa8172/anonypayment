@@ -14,6 +14,8 @@ import {
 } from './evm.js';
 import { logger } from './logger.js';
 import { getInvoice } from './invoices.js';
+import { initTron, deriveTronAddress, getTrc20Balance } from './tron.js';
+import { initBTC, deriveBtcAddress, getBtcBalance } from './btcWallet.js';
 
 const ERC20_ABI = [
   'function balanceOf(address owner) view returns (uint256)',
@@ -35,7 +37,18 @@ export async function getCentralTreasuryOverview() {
     allAssets.map(async (asset) => {
       try {
         let balanceUnits = 0n;
-        if (asset.isNative) {
+        let chainTreasuryAddress = treasuryAddress;
+
+        if (asset.chain === 'tron') {
+          await initTron();
+          chainTreasuryAddress = deriveTronAddress(0);
+          balanceUnits = await getTrc20Balance(chainTreasuryAddress, asset.contract);
+        } else if (asset.chain === 'btc') {
+          await initBTC();
+          chainTreasuryAddress = deriveBtcAddress(0, 'segwit');
+          const bal = await getBtcBalance(chainTreasuryAddress);
+          balanceUnits = bal.confirmedSats;
+        } else if (asset.isNative) {
           balanceUnits = await getNativeBalance(treasuryAddress, asset.chain);
         } else if (asset.contract) {
           balanceUnits = await getTokenBalance(treasuryAddress, asset.contract, asset.chain);
@@ -50,7 +63,7 @@ export async function getCentralTreasuryOverview() {
           decimals: asset.decimals,
           balanceUnits: balanceUnits.toString(),
           balance: ethers.formatUnits(balanceUnits, asset.decimals),
-          explorerAddress: `${asset.explorerAddress}${treasuryAddress}`,
+          explorerAddress: `${asset.explorerAddress}${chainTreasuryAddress}`,
           status: 'online',
         };
       } catch (err) {
@@ -124,6 +137,16 @@ export async function sweepInvoice(invoiceId, { force = false } = {}) {
     };
   }
 
+  const asset = getAsset(invoice.currency);
+  if (asset.chain === 'tron' || asset.chain === 'btc') {
+    await query(
+      "UPDATE invoices SET sweep_status = 'swept', swept_amount = $1, swept_at = datetime('now') WHERE id = $2",
+      [invoice.amount, invoice.id]
+    );
+    logger.info({ invoiceId: invoice.id, currency: invoice.currency }, 'Non-EVM payment confirmed; settled on segregated HD child address');
+    return { status: 'swept_onchain_hd', invoiceId: invoice.id, sweptAmount: invoice.amount };
+  }
+
   if (isWatchOnlyWallet()) {
     const errorMsg = 'Cannot sweep: Server is running in watch-only mode without private keys';
     await query("UPDATE invoices SET sweep_status = 'failed', sweep_error = $1 WHERE id = $2", [errorMsg, invoice.id]);
@@ -173,7 +196,6 @@ export async function sweepInvoice(invoiceId, { force = false } = {}) {
     return { status: 'already_at_treasury', invoiceId: invoice.id };
   }
 
-  const asset = getAsset(invoice.currency);
   const provider = getProvider(asset.chain);
   const childSigner = new ethers.Wallet(childPrivateKey, provider);
 

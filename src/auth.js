@@ -114,17 +114,19 @@ export function verifySessionToken(token) {
 }
 
 /**
- * Generates an unguessable live API key with high entropy.
+ * Generates an unguessable production live API key with 256-bit cryptographic entropy.
+ * Format: pr_live_<64 hex characters>
  */
 export function generateApiKey(prefix = 'mch_live_') {
-  return `${prefix}${crypto.randomBytes(24).toString('hex')}`;
+  return `${prefix}${crypto.randomBytes(32).toString('hex')}`;
 }
 
 /**
- * Generates a webhook secret for HMAC signature verification.
+ * Generates a production webhook secret with 256-bit entropy for HMAC-SHA256 verification.
+ * Format: whsec_<64 hex characters>
  */
 export function generateWebhookSecret() {
-  return `whsec_${crypto.randomBytes(24).toString('hex')}`;
+  return `whsec_${crypto.randomBytes(32).toString('hex')}`;
 }
 
 /**
@@ -745,8 +747,61 @@ export async function updateMerchantPayoutSettings(merchantId, { payoutAddress, 
 }
 
 /**
+ * Rotates and auto-generates a fresh cryptographically random 256-bit production API Key.
+ * Format: pr_live_<64 hex chars>
+ */
+export async function rotateApiKey(userId) {
+  const isSuperAdmin = userId === 'admin';
+  const newApiKey = generateApiKey(isSuperAdmin ? 'pr_live_' : 'mch_live_');
+  let res = await query(
+    `UPDATE merchants SET api_key = $1, updated_at = datetime('now') WHERE id = $2 RETURNING *`,
+    [newApiKey, userId]
+  );
+  if (res.rows.length === 0 && userId === 'admin') {
+    res = await query(
+      `UPDATE merchants SET api_key = $1, updated_at = datetime('now') WHERE role = 'admin' RETURNING *`,
+      [newApiKey]
+    );
+  }
+  if (res.rows.length === 0) throw new Error('Account not found');
+
+  if (res.rows[0].role === 'admin' || userId === 'admin') {
+    config.adminApiKey = newApiKey;
+  }
+
+  logger.info({ userId, role: res.rows[0].role }, 'Production API Key rotated successfully');
+  return { apiKey: newApiKey };
+}
+
+/**
+ * Rotates and auto-generates a fresh 256-bit Webhook Signing Secret.
+ * Format: whsec_<64 hex chars>
+ */
+export async function rotateWebhookSecret(userId) {
+  const newSecret = generateWebhookSecret();
+  let res = await query(
+    `UPDATE merchants SET webhook_secret = $1, updated_at = datetime('now') WHERE id = $2 RETURNING *`,
+    [newSecret, userId]
+  );
+  if (res.rows.length === 0 && userId === 'admin') {
+    res = await query(
+      `UPDATE merchants SET webhook_secret = $1, updated_at = datetime('now') WHERE role = 'admin' RETURNING *`,
+      [newSecret]
+    );
+  }
+  if (res.rows.length === 0) throw new Error('Account not found');
+
+  if (res.rows[0].role === 'admin' || userId === 'admin') {
+    config.webhookSecret = newSecret;
+  }
+
+  logger.info({ userId, role: res.rows[0].role }, 'Webhook Signing Secret rotated successfully');
+  return { webhookSecret: newSecret };
+}
+
+/**
  * Ensures the master Super Admin user account is seeded and configured.
- * Reads ADMIN_PASSWORD from environment. Warns if using default password.
+ * Reads ADMIN_PASSWORD from environment. Auto-generates production pr_live_ keys.
  */
 export async function ensureAdminAccount() {
   const adminEmail = (process.env.ADMIN_EMAIL || 'admin@gateway.local').toLowerCase().trim();
@@ -760,22 +815,46 @@ export async function ensureAdminAccount() {
   }
 
   const effectivePassword = adminPassword || 'AdminGateway#2026!SecureKey';
-  const adminApiKey = config.adminApiKey;
+  let adminApiKey = config.adminApiKey;
+
+  // Auto-generate high-entropy production key if empty or dummy
+  if (!adminApiKey || adminApiKey.includes('demo') || adminApiKey.includes('gateway_admin')) {
+    adminApiKey = generateApiKey('pr_live_');
+    config.adminApiKey = adminApiKey;
+  }
 
   const passwordHash = hashPassword(effectivePassword);
-  const webhookSecret = generateWebhookSecret();
+  const webhookSecret = config.webhookSecret && config.webhookSecret.length >= 32
+    ? config.webhookSecret
+    : generateWebhookSecret();
 
   await query(
     `INSERT INTO merchants (id, email, first_name, last_name, business_name, password_hash, role, status, api_key, webhook_url, webhook_secret, wallet_id, created_at, updated_at)
      VALUES ('admin', $1, 'Central', 'Admin', 'Central Platform Super Admin', $2, 'admin', 'active', $3, NULL, $4, 'default', datetime('now'), datetime('now'))
      ON CONFLICT (id) DO UPDATE SET
-       api_key = EXCLUDED.api_key,
        password_hash = EXCLUDED.password_hash,
        role = 'admin',
        status = 'active',
        updated_at = datetime('now')`,
     [adminEmail, passwordHash, adminApiKey, webhookSecret]
   );
+
+  // Upgrade any legacy or demo dummy keys to real production pr_live_ keys
+  const adminCheck = await query("SELECT api_key FROM merchants WHERE id = 'admin'");
+  if (!adminCheck.rows[0]?.api_key || !adminCheck.rows[0].api_key.startsWith('pr_live_')) {
+    const prodKey = generateApiKey('pr_live_');
+    await query("UPDATE merchants SET api_key = $1 WHERE id = 'admin'", [prodKey]);
+    config.adminApiKey = prodKey;
+  }
+
+  // Ensure all merchants have production keys if they had dummy values
+  const legacyMchs = await query("SELECT id, api_key FROM merchants WHERE api_key LIKE '%gateway_admin%' OR api_key LIKE '%demo%'");
+  for (const m of legacyMchs.rows) {
+    const isSuperAdmin = m.id === 'admin';
+    const freshKey = generateApiKey(isSuperAdmin ? 'pr_live_' : 'mch_live_');
+    await query("UPDATE merchants SET api_key = $1 WHERE id = $2", [freshKey, m.id]);
+  }
+
   logger.info({ adminEmail }, 'Master Super Admin account synchronized');
 }
 

@@ -109,10 +109,10 @@ export async function authenticate(req, res, next) {
     // Admin session
     if (claims.role === 'admin' || claims.sub === 'admin') {
       req.user = {
-        id: 'admin',
+        id: claims.sub || 'admin',
         role: 'admin',
         email: claims.email || process.env.ADMIN_EMAIL || 'admin@gateway.local',
-        walletId: 'default',
+        walletId: claims.walletId || 'default',
         businessName: claims.businessName || 'Platform Super Admin',
       };
       return next();
@@ -161,15 +161,12 @@ export async function authenticate(req, res, next) {
     }
   }
 
-  // 3. Check Merchant Live API Key
-  if (credential.startsWith('mch_live_')) {
-    try {
-      const merchant = await getMerchantByApiKey(credential);
-      if (!merchant) {
-        return res.status(401).json({ error: 'Unauthorized: Invalid merchant API key' });
-      }
+  // 3. Check Database API Key (pr_live_..., mch_live_..., or any stored merchant/admin key)
+  try {
+    const merchant = await getMerchantByApiKey(credential);
+    if (merchant) {
       if (merchant.status === 'suspended') {
-        return res.status(403).json({ error: 'Forbidden: Merchant account is suspended' });
+        return res.status(403).json({ error: 'Forbidden: Account is suspended' });
       }
       req.user = {
         id: merchant.id,
@@ -179,9 +176,10 @@ export async function authenticate(req, res, next) {
         businessName: merchant.business_name,
       };
       return next();
-    } catch (err) {
-      return res.status(500).json({ error: 'Authentication service error' });
     }
+  } catch (err) {
+    logger.error({ err }, 'Authentication service error');
+    return res.status(500).json({ error: 'Authentication service error' });
   }
 
   return res.status(401).json({ error: 'Unauthorized: Invalid API key or session token' });

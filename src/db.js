@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import pg from 'pg';
 import sqlite3 from 'sqlite3';
 import { logger } from './logger.js';
+import { redactSensitiveData } from './errors.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const { Pool } = pg;
@@ -132,6 +133,18 @@ export async function initDb() {
       }
       if (!colNames.has('receipt_email_sent')) {
         await query("ALTER TABLE invoices ADD COLUMN receipt_email_sent INTEGER DEFAULT 0");
+      }
+      if (!colNames.has('fee_amount')) {
+        await query("ALTER TABLE invoices ADD COLUMN fee_amount TEXT");
+      }
+      if (!colNames.has('fee_units')) {
+        await query("ALTER TABLE invoices ADD COLUMN fee_units TEXT");
+      }
+      if (!colNames.has('net_amount')) {
+        await query("ALTER TABLE invoices ADD COLUMN net_amount TEXT");
+      }
+      if (!colNames.has('net_units')) {
+        await query("ALTER TABLE invoices ADD COLUMN net_units TEXT");
       }
 
       // Check payment_links columns
@@ -393,7 +406,14 @@ export async function query(text, params = []) {
     if (isQueryWithResults) {
       sqliteDb.all(sqliteQuery, finalParams, (err, rows) => {
         if (err) {
-          logger.error({ err: err.message, query: text, params: finalParams }, 'SQLite query error');
+          logger.error(
+            {
+              err: redactSensitiveData(err.message),
+              query: redactSensitiveData(text),
+              params: redactSensitiveData(finalParams),
+            },
+            'SQLite query error'
+          );
           return reject(err);
         }
         resolve({ rows: rows || [], rowCount: rows ? rows.length : 0 });
@@ -401,7 +421,14 @@ export async function query(text, params = []) {
     } else {
       sqliteDb.run(sqliteQuery, finalParams, function (err) {
         if (err) {
-          logger.error({ err: err.message, query: text, params: finalParams }, 'SQLite run error');
+          logger.error(
+            {
+              err: redactSensitiveData(err.message),
+              query: redactSensitiveData(text),
+              params: redactSensitiveData(finalParams),
+            },
+            'SQLite run error'
+          );
           return reject(err);
         }
         resolve({ rows: [], rowCount: this.changes });

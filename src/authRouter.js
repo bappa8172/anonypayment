@@ -11,11 +11,16 @@ import {
   updateMerchantPayoutSettings,
   createSessionToken,
   getMerchantByApiKey,
+  rotateApiKey,
+  rotateWebhookSecret,
+  generateApiKey,
+  generateWebhookSecret,
 } from './auth.js';
 import { config } from './config.js';
 import { query } from './db.js';
 import { authRateLimit, authenticate, assertTrustedWebhookUrl } from './security.js';
 import { auditLog, getClientIp } from './audit.js';
+import { redactSensitiveData } from './errors.js';
 
 const router = express.Router();
 
@@ -48,18 +53,18 @@ const loginSchema = z.object({
 });
 
 // 1. Request Signup OTP (Email Verification via Hostinger SMTP)
-router.post('/signup/request-otp', authRateLimit({ windowMs: 60_000, max: 10 }), async (req, res) => {
+router.post('/signup/request-otp', authRateLimit({ windowMs: 60_000, max: 10 }), async (req, res, next) => {
   try {
     const data = signupOtpRequestSchema.parse(req.body);
     const result = await requestSignupOtp(data);
     res.json(result);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    next(err);
   }
 });
 
 // 2. Verify Signup OTP & Create Merchant Account
-router.post('/signup/verify-otp', authRateLimit({ windowMs: 60_000, max: 15 }), async (req, res) => {
+router.post('/signup/verify-otp', authRateLimit({ windowMs: 60_000, max: 15 }), async (req, res, next) => {
   try {
     const { email, otp } = otpVerifySchema.parse(req.body);
     const { user, token, message } = await verifySignupOtp({ email, otp });
@@ -82,14 +87,14 @@ router.post('/signup/verify-otp', authRateLimit({ windowMs: 60_000, max: 15 }), 
       action: 'auth.signup',
       ip: getClientIp(req),
       result: 'failure',
-      details: { email: req.body?.email, error: err.message },
+      details: { email: req.body?.email, error: redactSensitiveData(err.message) },
     });
-    res.status(400).json({ error: err.message });
+    next(err);
   }
 });
 
 // 3. Request Login 2FA OTP (Email Verification via Hostinger SMTP)
-router.post('/login/request-otp', authRateLimit({ windowMs: 60_000, max: 10 }), async (req, res) => {
+router.post('/login/request-otp', authRateLimit({ windowMs: 60_000, max: 10 }), async (req, res, next) => {
   try {
     const { email, password } = loginSchema.parse(req.body);
     const result = await requestLoginOtp({ email, password });
@@ -101,14 +106,14 @@ router.post('/login/request-otp', authRateLimit({ windowMs: 60_000, max: 10 }), 
       action: isLockout ? 'auth.account_locked' : 'auth.login_failed',
       ip: getClientIp(req),
       result: 'failure',
-      details: { email: req.body?.email, reason: err.message },
+      details: { email: req.body?.email, reason: redactSensitiveData(err.message) },
     });
-    res.status(401).json({ error: err.message });
+    next(err);
   }
 });
 
 // 4. Verify Login 2FA OTP & Authenticate
-router.post('/login/verify-otp', authRateLimit({ windowMs: 60_000, max: 15 }), async (req, res) => {
+router.post('/login/verify-otp', authRateLimit({ windowMs: 60_000, max: 15 }), async (req, res, next) => {
   try {
     const { email, otp } = otpVerifySchema.parse(req.body);
     const { user, token, message } = await verifyLoginOtp({ email, otp });
@@ -131,14 +136,14 @@ router.post('/login/verify-otp', authRateLimit({ windowMs: 60_000, max: 15 }), a
       action: 'auth.otp_invalid',
       ip: getClientIp(req),
       result: 'failure',
-      details: { email: req.body?.email, error: err.message },
+      details: { email: req.body?.email, error: redactSensitiveData(err.message) },
     });
-    res.status(401).json({ error: err.message });
+    next(err);
   }
 });
 
 // Direct Business/Merchant Registration (No KYC, Direct Fallback)
-router.post('/register', authRateLimit({ windowMs: 60_000, max: 10 }), async (req, res) => {
+router.post('/register', authRateLimit({ windowMs: 60_000, max: 10 }), async (req, res, next) => {
   try {
     const data = registerSchema.parse(req.body);
     if (data.webhookUrl) {
@@ -163,12 +168,12 @@ router.post('/register', authRateLimit({ windowMs: 60_000, max: 10 }), async (re
       user,
     });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    next(err);
   }
 });
 
 // Direct Merchant & Admin Login (Fallback)
-router.post('/login', authRateLimit({ windowMs: 60_000, max: 15 }), async (req, res) => {
+router.post('/login', authRateLimit({ windowMs: 60_000, max: 15 }), async (req, res, next) => {
   try {
     const { email, password } = loginSchema.parse(req.body);
     const { user, token } = await loginUser({ email, password });
@@ -178,16 +183,16 @@ router.post('/login', authRateLimit({ windowMs: 60_000, max: 15 }), async (req, 
       user,
     });
   } catch (err) {
-    res.status(401).json({ error: err.message });
+    next(err);
   }
 });
 
 // Instant Super Admin & Merchant Authentication via API Key
-router.post('/login/api-key', authRateLimit({ windowMs: 60_000, max: 20 }), async (req, res) => {
+router.post('/login/api-key', authRateLimit({ windowMs: 60_000, max: 20 }), async (req, res, next) => {
   try {
     const apiKey = (req.body?.apiKey || '').trim();
     if (!apiKey) {
-      return res.status(400).json({ error: 'API Key is required' });
+      return res.status(400).json({ error: 'API Key is required', code: 'BAD_REQUEST' });
     }
 
     // 1. Check Master Admin API Key
@@ -217,7 +222,7 @@ router.post('/login/api-key', authRateLimit({ windowMs: 60_000, max: 20 }), asyn
     // 2. Check Merchant API Key
     const merchant = await getMerchantByApiKey(apiKey);
     if (!merchant) {
-      return res.status(401).json({ error: 'Invalid API Key' });
+      return res.status(401).json({ error: 'Invalid API Key', code: 'UNAUTHORIZED' });
     }
 
     const token = createSessionToken({
@@ -243,33 +248,50 @@ router.post('/login/api-key', authRateLimit({ windowMs: 60_000, max: 20 }), asyn
       },
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
-
 // 3. Current Authenticated Profile
-router.get('/me', authenticate, async (req, res) => {
+router.get('/me', authenticate, async (req, res, next) => {
   try {
-    if (req.user.role === 'admin') {
-      const coldRes = await query("SELECT value FROM settings WHERE key = 'cold_storage_address'");
-      const autoSweepRes = await query("SELECT value FROM settings WHERE key = 'auto_sweep_enabled'");
-      return res.json({
-        user: {
-          id: 'admin',
-          email: req.user.email,
-          businessName: 'Platform Super Admin',
-          role: 'admin',
-          status: 'active',
-          walletId: 'default',
-          payoutAddress: coldRes.rows[0]?.value || null,
-          autoForward: autoSweepRes.rows[0]?.value !== 'false',
-        },
-      });
+    // 1. Look up user record in merchants table by ID or email
+    let merchant = await getMerchantById(req.user.id);
+    if (!merchant && req.user.email) {
+      const byEmail = await query('SELECT * FROM merchants WHERE email = $1', [req.user.email.toLowerCase().trim()]);
+      merchant = byEmail.rows[0];
     }
 
-    const merchant = await getMerchantById(req.user.id);
-    if (!merchant) return res.status(404).json({ error: 'User not found' });
+    if (!merchant && req.user.role === 'admin') {
+      const byAdmin = await query("SELECT * FROM merchants WHERE id = 'admin' OR role = 'admin' LIMIT 1");
+      merchant = byAdmin.rows[0];
+    }
+
+    if (!merchant) return res.status(404).json({ error: 'User not found', code: 'NOT_FOUND' });
+
+    // 2. Ensure real high-entropy production API key exists (upgrade any legacy or dummy key)
+    if (!merchant.api_key || merchant.api_key.includes('gateway_admin') || merchant.api_key.includes('demo') || (!merchant.api_key.startsWith('pr_live_') && !merchant.api_key.startsWith('mch_live_'))) {
+      const isSuperAdmin = merchant.role === 'admin' || merchant.id === 'admin';
+      const prodKey = generateApiKey(isSuperAdmin ? 'pr_live_' : 'mch_live_');
+      await query("UPDATE merchants SET api_key = $1, updated_at = datetime('now') WHERE id = $2", [prodKey, merchant.id]);
+      merchant.api_key = prodKey;
+      if (isSuperAdmin) {
+        config.adminApiKey = prodKey;
+      }
+    }
+
+    // 3. Ensure real webhook signing secret exists
+    if (!merchant.webhook_secret || merchant.webhook_secret.includes('dummy') || !merchant.webhook_secret.startsWith('whsec_')) {
+      const prodSec = generateWebhookSecret();
+      await query("UPDATE merchants SET webhook_secret = $1, updated_at = datetime('now') WHERE id = $2", [prodSec, merchant.id]);
+      merchant.webhook_secret = prodSec;
+      if (merchant.role === 'admin' || merchant.id === 'admin') {
+        config.webhookSecret = prodSec;
+      }
+    }
+
+    const coldRes = await query("SELECT value FROM settings WHERE key = 'cold_storage_address'");
+    const autoSweepRes = await query("SELECT value FROM settings WHERE key = 'auto_sweep_enabled'");
 
     res.json({
       user: {
@@ -277,20 +299,68 @@ router.get('/me', authenticate, async (req, res) => {
         email: merchant.email,
         firstName: merchant.first_name || null,
         lastName: merchant.last_name || null,
-        businessName: merchant.business_name,
+        businessName: merchant.business_name || (merchant.role === 'admin' ? 'Platform Super Admin' : 'Merchant'),
         role: merchant.role,
         status: merchant.status,
         walletId: merchant.wallet_id,
         apiKey: merchant.api_key,
         webhookSecret: merchant.webhook_secret,
         webhookUrl: merchant.webhook_url,
-        payoutAddress: merchant.payout_address || null,
-        autoForward: merchant.auto_forward !== 0,
+        payoutAddress: merchant.payout_address || coldRes.rows[0]?.value || null,
+        autoForward: merchant.auto_forward !== undefined ? merchant.auto_forward !== 0 : autoSweepRes.rows[0]?.value !== 'false',
         createdAt: merchant.created_at,
       },
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
+  }
+});
+
+// 3b. Rotate / Auto-Generate Production API Key
+router.post('/profile/api-key/regenerate', authenticate, async (req, res, next) => {
+  try {
+    const result = await rotateApiKey(req.user.id);
+    await auditLog({
+      action: 'auth.api_key_rotate',
+      actorId: req.user.id,
+      actorRole: req.user.role,
+      targetType: 'merchant',
+      targetId: req.user.id,
+      ip: getClientIp(req),
+      result: 'success',
+      details: { prefix: 'pr_live_' },
+    });
+    res.json({
+      success: true,
+      apiKey: result.apiKey,
+      message: 'New production API key generated successfully.',
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 3c. Rotate / Auto-Generate Webhook Signing Secret
+router.post('/profile/webhook-secret/regenerate', authenticate, async (req, res, next) => {
+  try {
+    const result = await rotateWebhookSecret(req.user.id);
+    await auditLog({
+      action: 'auth.webhook_secret_rotate',
+      actorId: req.user.id,
+      actorRole: req.user.role,
+      targetType: 'merchant',
+      targetId: req.user.id,
+      ip: getClientIp(req),
+      result: 'success',
+      details: { prefix: 'whsec_' },
+    });
+    res.json({
+      success: true,
+      webhookSecret: result.webhookSecret,
+      message: 'New webhook signing secret generated successfully.',
+    });
+  } catch (err) {
+    next(err);
   }
 });
 
@@ -300,7 +370,7 @@ const payoutSettingsSchema = z.object({
   autoForward: z.boolean().optional(),
 });
 
-router.post('/profile/payout-address', authenticate, async (req, res) => {
+router.post('/profile/payout-address', authenticate, async (req, res, next) => {
   try {
     const { payoutAddress, autoForward } = payoutSettingsSchema.parse(req.body);
 
@@ -308,7 +378,7 @@ router.post('/profile/payout-address', authenticate, async (req, res) => {
       if (payoutAddress && payoutAddress.trim()) {
         const { ethers } = await import('ethers');
         if (!ethers.isAddress(payoutAddress.trim())) {
-          return res.status(400).json({ error: 'Invalid EVM 0x address' });
+          return res.status(400).json({ error: 'Invalid EVM 0x address', code: 'BAD_REQUEST' });
         }
         await query(
           `INSERT INTO settings (key, value) VALUES ('cold_storage_address', $1)
@@ -332,7 +402,7 @@ router.post('/profile/payout-address', authenticate, async (req, res) => {
     });
     res.json({ success: true, merchant: updated });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    next(err);
   }
 });
 

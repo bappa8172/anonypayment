@@ -59,13 +59,14 @@ Payrail is an enterprise-grade, self-hosted cryptocurrency payment gateway and w
 ### 1. Install & Start
 ```bash
 npm install
-npm start
+npm run dev    # Starts both the Node Crypto API (port 3000) and React Frontend (port 5173)
 ```
 
 Open your browser:
-- **Merchant Dashboard**: [http://localhost:3000/dashboard](http://localhost:3000/dashboard)
-- **Hosted Checkout**: `http://localhost:3000/pay?invoice=<id>`
-- **Health Check**: [http://localhost:3000/health](http://localhost:3000/health)
+- **React Frontend (Vite)**: [http://localhost:5173/](http://localhost:5173/)
+- **Merchant Dashboard**: [http://localhost:5173/dashboard](http://localhost:5173/dashboard)
+- **Hosted Checkout**: `http://localhost:5173/pay?invoice=<id>`
+- **API Health Check**: [http://localhost:3000/health](http://localhost:3000/health)
 
 ### 2. Run Tests
 ```bash

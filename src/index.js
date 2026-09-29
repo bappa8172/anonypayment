@@ -11,10 +11,15 @@ import publicRouter from './public.js';
 import authRouter from './authRouter.js';
 import merchantApiRouter from './merchantApiRouter.js';
 import { startEVMMonitor } from './monitors/evmMonitor.js';
+import { startTronMonitor } from './monitors/tronMonitor.js';
+import { startBTCMonitor } from './monitors/btcMonitor.js';
 import { initEVM } from './evm.js';
+import { initTron } from './tron.js';
+import { initBTC } from './btcWallet.js';
 import { basicRateLimit, globalRateLimit } from './security.js';
 import { initMailer } from './mailer.js';
 import { purgeExpiredOtps, purgeExpiredLockouts } from './auth.js';
+import { sanitizeErrorForResponse, redactSensitiveData } from './errors.js';
 
 const app = express();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -24,15 +29,15 @@ const isDev = config.environment !== 'production';
 // SECURITY HEADERS — Helmet with strict Content Security Policy
 // ============================================================
 app.use(helmet({
-  // Content Security Policy — only allow resources from same origin
+  // Content Security Policy — allow resources needed for dashboard & fonts
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", "'unsafe-inline'"],   // unsafe-inline needed for inline dashboard scripts
-      styleSrc:  ["'self'", "'unsafe-inline'"],
+      styleSrc:  ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
       imgSrc:    ["'self'", 'data:', 'https:'],    // data: needed for QR codes
-      connectSrc: ["'self'"],
-      fontSrc:   ["'self'", 'data:'],
+      connectSrc: ["'self'", ...(isDev ? ['http://localhost:*', 'ws://localhost:*'] : [])],
+      fontSrc:   ["'self'", 'data:', 'https://fonts.gstatic.com'],
       objectSrc: ["'none'"],
       frameSrc:  ["'none'"],
       upgradeInsecureRequests: isDev ? null : [],
@@ -98,13 +103,7 @@ app.use('/admin', express.json({ limit: '20kb', type: 'application/json' }));
 app.use(express.json({ limit: '50kb', type: 'application/json' }));
 
 // ============================================================
-// STATIC ASSETS
-// ============================================================
-const publicDir = path.join(__dirname, '..', 'public');
-app.use(express.static(publicDir));
-
-// ============================================================
-// ROUTES
+// API ROUTES
 // ============================================================
 app.use('/auth', authRouter);
 app.use('/v1/merchant', merchantApiRouter);
@@ -112,32 +111,16 @@ app.use('/v1', basicRateLimit({ max: 300 }));
 app.use('/admin', adminRouter);
 app.use('/v1', publicRouter);
 
-// ============================================================
-// PAGE ENTRY POINTS
-// ============================================================
-app.get('/login', (req, res) => {
-  res.sendFile(path.join(publicDir, 'auth.html'));
-});
-
-app.get('/signup', (req, res) => {
-  res.sendFile(path.join(publicDir, 'auth.html'));
-});
-
-app.get('/pay', (req, res) => {
-  res.sendFile(path.join(publicDir, 'pay.html'));
-});
-
-// Clean payment link resolution: /link/:code -> opens checkout to ask email first
+// Payment link resolution: /link/:code -> redirects to frontend checkout on port 5173
+const frontendUrl = config.frontendUrl || process.env.FRONTEND_URL || 'http://localhost:5173';
 app.get('/link/:code', (req, res) => {
-  res.redirect(`/pay?link=${encodeURIComponent(req.params.code)}`);
+  res.redirect(`${frontendUrl}/pay?link=${encodeURIComponent(req.params.code)}`);
 });
 
-app.get('/dashboard', (req, res) => {
-  res.sendFile(path.join(publicDir, 'dashboard.html'));
-});
-
-app.get('/', (req, res) => {
-  res.sendFile(path.join(publicDir, 'index.html'));
+// UI Route Redirects: Any browser visiting UI paths on port 3000 is forwarded to Vite frontend on 5173
+app.get(['/dashboard', '/pay', '/login', '/signup', '/flow-demo', '/demo'], (req, res) => {
+  const query = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
+  res.redirect(`${frontendUrl}${req.path}${query}`);
 });
 
 // ============================================================
@@ -150,20 +133,73 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Root Endpoint: Redirect browsers to Vite frontend, or return Headless Gateway API info to API clients
+app.get('/', (req, res) => {
+  if (req.accepts('html') && !req.accepts('json')) {
+    return res.redirect(frontendUrl);
+  }
+  res.json({
+    name: 'AnonyGateway Crypto API',
+    status: 'online',
+    version: '1.0.0',
+    network: config.networkMode,
+    frontend: frontendUrl,
+    endpoints: {
+      health: '/health',
+      auth: '/auth',
+      merchant: '/v1/merchant',
+      public: '/v1',
+      admin: '/admin',
+    },
+  });
+});
+
 // ============================================================
-// GLOBAL ERROR HANDLER — Never leak stack traces
+// 404 HANDLER FOR UNMATCHED ROUTES
+// ============================================================
+app.use((req, res) => {
+  res.status(404).json({ error: 'Endpoint not found', code: 'NOT_FOUND' });
+});
+
+// ============================================================
+// GLOBAL ERROR HANDLER — Never leak critical data, keys, or stack traces
 // ============================================================
 app.use((err, req, res, next) => {
-  const status = err.status || err.statusCode || 400;
+  const sanitized = sanitizeErrorForResponse(err, isDev);
 
-  // Log full error internally
-  logger.warn({ err: err.message, path: req.path, method: req.method, ip: req.ip }, 'Request error');
+  // Redact any sensitive data (keys, passwords, secrets, paths) from the server log
+  const safeLogErr = redactSensitiveData({
+    message: err?.message,
+    stack: err?.stack,
+    code: err?.code || sanitized.body.code,
+    statusCode: sanitized.statusCode,
+    requestId: sanitized.body.requestId,
+    path: req.path,
+    method: req.method,
+    ip: req.ip,
+  });
 
-  // Return sanitized error to client — no stack traces
-  if (err.message === 'Not allowed by CORS') {
-    return res.status(403).json({ error: 'Cross-origin request not permitted' });
+  if (sanitized.statusCode >= 500) {
+    logger.error(safeLogErr, 'Unhandled server error');
+  } else {
+    logger.warn(safeLogErr, 'Operational request error');
   }
-  res.status(status).json({ error: err.message || 'Invalid request' });
+
+  // Send purely sanitized payload to the client
+  return res.status(sanitized.statusCode).json(sanitized.body);
+});
+
+// ============================================================
+// PROCESS-LEVEL EXCEPTION SAFEGUARDS
+// ============================================================
+process.on('unhandledRejection', (reason) => {
+  const msg = reason instanceof Error ? (reason.stack || reason.message) : String(reason);
+  logger.error({ error: redactSensitiveData(msg) }, 'Unhandled Promise Rejection');
+});
+
+process.on('uncaughtException', (err) => {
+  logger.fatal({ error: redactSensitiveData(err?.stack || err?.message) }, 'Uncaught Exception');
+  process.exit(1);
 });
 
 // ============================================================
@@ -174,7 +210,19 @@ async function main() {
   await initDb();
   initMailer();
   await initEVM();
-  await startEVMMonitor();
+  await initTron();
+  await initBTC();
+  app.listen(config.port, () => {
+    logger.info(`=================================================`);
+    logger.info(`🚀 AnonyGateway Server is LIVE!`);
+    logger.info(`🌐 Frontend UI:  ${frontendUrl}`);
+    logger.info(`🔌 API Backend:  http://localhost:${config.port}`);
+    logger.info(`🩺 Health Check: http://localhost:${config.port}/health`);
+    logger.info(`⚙️  Network:     ${config.networkMode.toUpperCase()} (Chain ID: ${config.evm.chainId})`);
+    logger.info(`🔑 Admin Key:   ${config.adminApiKey.slice(0, 10)}...`);
+    logger.info(`🛡️  Security:    ${config.environment.toUpperCase()} mode`);
+    logger.info(`=================================================`);
+  });
 
   // ── Periodic Security Cleanup Jobs ─────────────────────────────────────
   // Run every 5 minutes: purge expired OTPs and stale lockout records
@@ -183,19 +231,13 @@ async function main() {
     await purgeExpiredLockouts();
   }, 5 * 60 * 1000);
 
-  app.listen(config.port, () => {
-    logger.info(`=================================================`);
-    logger.info(`🚀 Crypto Payment Gateway & Wallet is LIVE!`);
-    logger.info(`🌐 Dashboard: http://localhost:${config.port}/dashboard`);
-    logger.info(`💳 Checkout:  http://localhost:${config.port}/pay?invoice=<id>`);
-    logger.info(`⚙️  Network:   ${config.networkMode.toUpperCase()} (Chain ID: ${config.evm.chainId})`);
-    logger.info(`🔑 Admin Key: ${config.adminApiKey.slice(0, 10)}...`);
-    logger.info(`🛡️  Security:  ${config.environment.toUpperCase()} mode`);
-    logger.info(`=================================================`);
-  });
+  // Start background payment monitors asynchronously
+  startEVMMonitor().catch(err => logger.error({ err: err.message }, 'EVM monitor startup error'));
+  startTronMonitor().catch(err => logger.error({ err: err.message }, 'Tron monitor startup error'));
+  startBTCMonitor().catch(err => logger.error({ err: err.message }, 'BTC monitor startup error'));
 }
 
 main().catch(err => {
-  logger.error(err);
+  logger.error({ error: redactSensitiveData(err?.stack || err?.message) }, 'Gateway fatal startup failure');
   process.exit(1);
 });

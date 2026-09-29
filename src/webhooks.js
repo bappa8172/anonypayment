@@ -51,7 +51,7 @@ export async function sendWebhook(url, payload, secret) {
           'X-Webhook-Signature': `sha256=${signature}`,
           'X-Webhook-Timestamp': timestamp,
           'X-Webhook-Event': payload.event || 'payment.event',
-          'User-Agent': 'Payrail-Webhook/1.0',
+          'User-Agent': 'AnonyGateway-Webhook/1.0',
         },
         body,
         signal: controller.signal,

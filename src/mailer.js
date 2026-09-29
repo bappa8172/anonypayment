@@ -6,10 +6,11 @@ import { query } from './db.js';
 
 let transporter = null;
 
-export function initMailer() {
+export function initMailer(forceSimulated = false) {
+  const isTest = forceSimulated || process.env.NODE_ENV === 'test' || Boolean(process.env.SQLITE_DB_PATH && process.env.SQLITE_DB_PATH.includes('test'));
   const { host, port, secure, user, pass } = config.email;
 
-  if (host && user) {
+  if (host && user && !isTest) {
     transporter = nodemailer.createTransport({
       host,
       port,
@@ -78,7 +79,8 @@ export async function sendEmail({
 
   const mailClient = await getEmailTransporter();
   const emailLogId = uuidv4();
-  const isRealSmtp = Boolean(config.email.host && config.email.user);
+  const isTest = process.env.NODE_ENV === 'test' || Boolean(process.env.SQLITE_DB_PATH && process.env.SQLITE_DB_PATH.includes('test'));
+  const isRealSmtp = Boolean(config.email.host && config.email.user && !isTest);
 
   try {
     const info = await mailClient.sendMail({
@@ -117,7 +119,7 @@ export async function sendEmail({
  * 1. Email to Customer when Invoice is Generated
  */
 export function buildInvoiceCreatedHtml({ invoice, merchant, checkoutUrl }) {
-  const businessName = merchant?.business_name || 'Payrail Merchant';
+  const businessName = merchant?.business_name || 'AnonyGateway Merchant';
   return `
 <!DOCTYPE html>
 <html>
@@ -180,7 +182,7 @@ export function buildInvoiceCreatedHtml({ invoice, merchant, checkoutUrl }) {
       <a href="${checkoutUrl}" class="btn" target="_blank">Pay Now on Secure Checkout ⚡</a>
     </div>
     <div class="footer">
-      Powered by Payrail Real-Time Crypto Payment Gateway
+      Powered by AnonyGateway Crypto Payment Platform
     </div>
   </div>
 </body>
@@ -194,7 +196,7 @@ export function buildInvoiceCreatedHtml({ invoice, merchant, checkoutUrl }) {
 export function buildPaymentReceivedMerchantHtml({ invoice, merchant, txid, confirmations }) {
   const businessName = merchant?.business_name || 'Merchant';
   const explorerUrl = txid && txid.startsWith('0x') ? `https://bscscan.com/tx/${txid}` : null;
-  const dashboardUrl = `${config.publicUrl}/dashboard`;
+  const dashboardUrl = `${config.frontendUrl || config.publicUrl}/dashboard`;
 
   return `
 <!DOCTYPE html>
@@ -277,7 +279,7 @@ export function buildPaymentReceivedMerchantHtml({ invoice, merchant, txid, conf
       <a href="${dashboardUrl}" class="btn" target="_blank">Open Merchant Dashboard 📊</a>
     </div>
     <div class="footer">
-      Payrail Automated Merchant Notification System
+      AnonyGateway Automated Merchant Notification System
     </div>
   </div>
 </body>
@@ -371,7 +373,7 @@ export function buildPaymentReceiptCustomerHtml({ invoice, merchant, txid, confi
       </p>
     </div>
     <div class="footer">
-      Generated securely by Payrail Crypto Payment Gateway
+      Generated securely by AnonyGateway Crypto Payment Platform
     </div>
   </div>
 </body>
@@ -455,10 +457,10 @@ export async function notifyInvoiceCreated({ invoice, merchant }) {
   const customerEmail = invoice?.customer_email || invoice?.customerEmail;
   if (!invoice || !customerEmail) return null;
 
-  const checkoutUrl = `${config.publicUrl}/pay?invoice=${invoice.id}`;
+  const checkoutUrl = `${config.frontendUrl || config.publicUrl}/pay?invoice=${invoice.id}`;
   const html = buildInvoiceCreatedHtml({ invoice, merchant, checkoutUrl });
   const orderRef = invoice.order_id || invoice.orderId || invoice.id.slice(0, 8);
-  const subject = `Invoice #${orderRef} from ${merchant?.business_name || 'Payrail Merchant'}`;
+  const subject = `Invoice #${orderRef} from ${merchant?.business_name || 'AnonyGateway Merchant'}`;
 
   return await sendEmail({
     to: customerEmail,
@@ -478,8 +480,8 @@ export function buildOtpEmailHtml({ otp, purpose = 'signup', recipientName = '' 
   const isSignup = purpose === 'signup';
   const title = isSignup ? 'Confirm Your Registration' : 'Account Security Verification';
   const subtitle = isSignup
-    ? 'Verify your email address to complete your Payrail Merchant account setup.'
-    : 'A sign-in attempt was initiated for your Payrail Merchant account.';
+    ? 'Verify your email address to complete your AnonyGateway Merchant account setup.'
+    : 'A sign-in attempt was initiated for your AnonyGateway Merchant account.';
   const note = isSignup
     ? 'Enter this 6-digit code in your browser to verify your identity and activate your account.'
     : 'Enter this 6-digit one-time code to complete your login.';
@@ -510,7 +512,7 @@ export function buildOtpEmailHtml({ otp, purpose = 'signup', recipientName = '' 
 <body>
   <div class="card">
     <div class="header">
-      <h1>Payrail Gateway</h1>
+      <h1>AnonyGateway</h1>
       <div class="badge">Security Verification</div>
     </div>
     <div class="content">
@@ -526,11 +528,11 @@ export function buildOtpEmailHtml({ otp, purpose = 'signup', recipientName = '' 
       </div>
 
       <div class="warning-box">
-        <strong>Security Tip:</strong> Never share this verification code with anyone, including platform administrators. Payrail staff will never ask for your code.
+        <strong>Security Tip:</strong> Never share this verification code with anyone, including platform administrators. AnonyGateway staff will never ask for your code.
       </div>
     </div>
     <div class="footer">
-      Payrail Crypto Payment Gateway &bull; High Security Infrastructure<br>
+      AnonyGateway Crypto Platform &bull; Anonymous Non-Custodial Infrastructure<br>
       If you did not make this request, you can safely disregard this email.
     </div>
   </div>
@@ -544,10 +546,10 @@ export function buildOtpEmailHtml({ otp, purpose = 'signup', recipientName = '' 
 export async function sendOtpEmail({ to, otp, purpose = 'signup', recipientName = '' }) {
   const isSignup = purpose === 'signup';
   const subject = isSignup
-    ? `🔐 Payrail: Your Verification Code is ${otp}`
-    : `🔐 Payrail: Your Sign In Security Code is ${otp}`;
+    ? `🔐 AnonyGateway: Your Verification Code is ${otp}`
+    : `🔐 AnonyGateway: Your Sign In Security Code is ${otp}`;
   const html = buildOtpEmailHtml({ otp, purpose, recipientName });
-  const text = `Your Payrail ${isSignup ? 'registration' : 'login'} verification code is: ${otp}. It will expire in 10 minutes. Never share this code with anyone.`;
+  const text = `Your AnonyGateway ${isSignup ? 'registration' : 'login'} verification code is: ${otp}. It will expire in 10 minutes. Never share this code with anyone.`;
 
   return await sendEmail({
     to,

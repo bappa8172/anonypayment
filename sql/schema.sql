@@ -58,7 +58,11 @@ CREATE TABLE IF NOT EXISTS invoices (
   sweep_txid TEXT,
   swept_amount NUMERIC(36,18),
   swept_at TIMESTAMPTZ,
-  sweep_error TEXT
+  sweep_error TEXT,
+  fee_amount NUMERIC(36,18),
+  fee_units NUMERIC(78,0),
+  net_amount NUMERIC(36,18),
+  net_units NUMERIC(78,0)
 );
 
 CREATE TABLE IF NOT EXISTS email_logs (

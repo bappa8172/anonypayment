@@ -59,6 +59,7 @@ async function checkPendingInvoices() {
   for (const invoice of res.rows) {
     try {
       const asset = getAsset(invoice.currency);
+      if (asset.chain === 'tron' || asset.chain === 'btc') continue;
       const requiredUnits = BigInt(invoice.amount_units);
       let detectedBalance = 0n;
 
@@ -100,6 +101,7 @@ async function confirmObservedPayments() {
   for (const invoice of res.rows) {
     try {
       const asset = getAsset(invoice.currency);
+      if (asset.chain === 'tron' || asset.chain === 'btc') continue;
       const head = await getBlockNumber(asset.chain);
 
       let confirmations = 1;

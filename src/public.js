@@ -43,13 +43,13 @@ const verifyTxSchema = z.object({
   txid: z.string().regex(/^0x[a-fA-F0-9]{64}$/, 'Invalid Ethereum/BSC transaction hash'),
 });
 
-router.post('/invoices/:id/verify-tx', async (req, res) => {
+router.post('/invoices/:id/verify-tx', async (req, res, next) => {
   try {
     const { txid } = verifyTxSchema.parse(req.body);
     const updated = await verifyTxidForInvoice(req.params.id, txid);
     return res.json(publicInvoice(updated));
   } catch (error) {
-    return res.status(400).json({ error: error.message });
+    return next(error);
   }
 });
 
@@ -59,13 +59,13 @@ const customerEmailSchema = z.object({
   name: z.string().optional(),
 });
 
-const handleCustomerEmailUpdate = async (req, res) => {
+const handleCustomerEmailUpdate = async (req, res, next) => {
   try {
     const { email, name } = customerEmailSchema.parse(req.body);
     const updated = await updateInvoiceCustomerEmail(req.params.id, email, name);
     return res.json({ success: true, invoice: publicInvoice(updated) });
   } catch (error) {
-    return res.status(400).json({ error: error.message });
+    return next(error);
   }
 };
 
@@ -110,10 +110,11 @@ router.post('/payment-links/:code/checkout', async (req, res, next) => {
 });
 
 // 6. Checkout from Payment Link (GET - browser direct redirect)
+const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
 router.get('/payment-links/:code/checkout', async (req, res, next) => {
   try {
     const link = await getPaymentLinkByCode(req.params.code);
-    if (!link) return res.status(404).redirect('/pay?error=link_not_found');
+    if (!link) return res.status(404).redirect(`${frontendUrl}/pay?error=link_not_found`);
 
     const invoice = await createInvoice({
       currency: link.currency,
@@ -124,7 +125,7 @@ router.get('/payment-links/:code/checkout', async (req, res, next) => {
       orderId: `LINK-${link.code}`,
       metadata: { paymentLinkCode: link.code, title: link.title },
     });
-    return res.redirect(`/pay?invoice=${invoice.id}`);
+    return res.redirect(`${frontendUrl}/pay?invoice=${invoice.id}`);
   } catch (error) {
     return next(error);
   }

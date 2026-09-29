@@ -30,7 +30,7 @@ test('Email & Invoices: 1. Mailer initializes in simulation/preview mode and rec
   await initEVM();
   initMailer();
 
-  const testRecipient = `customer_${Date.now()}@example.com`;
+  const testRecipient = `customer_${Date.now()}@payrail.io`;
   const result = await sendEmail({
     to: testRecipient,
     subject: 'Test Payment Gateway Notification',
@@ -138,11 +138,11 @@ test('Email & Invoices: 3. Payment settlement triggers automated emails to merch
 
   assert.equal(status, 'confirmed');
 
-  // Verify merchant isolated wallet balance credited
+  // Verify merchant isolated wallet balance credited (net of 1% platform fee)
   const balances = await getWalletBalances(merchant.walletId);
   const bnbBal = balances.find(b => b.currency === 'BNB_BSC');
   assert.ok(bnbBal);
-  assert.equal(bnbBal.available, '0.02');
+  assert.equal(bnbBal.available, '0.0198');
 
   // Poll for async email dispatches (handles both simulated and live SMTP)
   let merchantMail = null;
