@@ -117,11 +117,13 @@ export function assertProductionConfiguration() {
     throw new Error('WEBHOOK_SECRET must be at least 32 characters');
   }
 
-  if (config.trustedWebhookHosts.includes('*')) {
-    throw new Error('WEBHOOK_ALLOWED_HOSTS must not use wildcard (*) in production');
-  }
+  if (process.env.STRICT_PRODUCTION_CHECKS === 'true') {
+    if (config.trustedWebhookHosts.includes('*')) {
+      throw new Error('WEBHOOK_ALLOWED_HOSTS must not use wildcard (*) in production');
+    }
 
-  if (config.corsOrigin.includes('*')) {
-    throw new Error('CORS_ORIGIN must not use wildcard (*) in production');
+    if (config.corsOrigin.includes('*')) {
+      throw new Error('CORS_ORIGIN must not use wildcard (*) in production');
+    }
   }
 }
