@@ -13,8 +13,6 @@ import { creditWalletBalance } from '../wallet.js';
 let btcMonitorInterval = null;
 
 async function emitStatusWebhook(invoice, status, txid, confirmations) {
-  if (invoice.status === status) return;
-
   let webhookSecret;
   if (invoice.merchant_id) {
     try {

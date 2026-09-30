@@ -23,8 +23,6 @@ async function maybeAutoSweep(invoiceId) {
 }
 
 async function emitStatusWebhook(invoice, status, txid, confirmations) {
-  if (invoice.status === status) return;
-
   // Look up merchant's own webhook_secret for per-merchant HMAC signing
   let webhookSecret;
   if (invoice.merchant_id) {

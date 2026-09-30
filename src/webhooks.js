@@ -20,7 +20,10 @@ const RETRY_BASE_DELAY_MS = 1000;  // 1s, 2s, 4s
  * @param {string} [secret]    - Merchant-specific webhook secret (preferred over global)
  */
 export async function sendWebhook(url, payload, secret) {
-  if (!url) return;
+  if (!url) {
+    logger.debug({ event: payload?.event, invoiceId: payload?.id }, 'Webhook skipped — no URL configured for this invoice');
+    return;
+  }
 
   // Use per-merchant secret when available; fall back to global platform secret
   const signingSecret = (secret && secret.trim()) ? secret : config.webhookSecret;

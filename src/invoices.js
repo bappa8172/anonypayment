@@ -123,7 +123,8 @@ export async function createInvoice({
     const res = await query(`UPDATE settings SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT) WHERE key = 'evm_next_index' RETURNING value`);
     derivationIndex = parseInt(res.rows[0].value, 10) - 1;
     address = deriveAddress(derivationIndex);
-    confirmationsRequired = asset.isNative ? (asset.chain === 'sepolia' ? 2 : 2) : config.evm.confirmations;
+    // All EVM assets (native and token) use the same configured confirmation threshold
+    confirmationsRequired = asset.chain === 'sepolia' ? 2 : config.evm.confirmations;
   }
 
   const normalizedAmount = normalizeAmount(amount, asset.decimals);
