@@ -57,7 +57,6 @@ export async function sendWebhook(url, payload, secret) {
           'X-Webhook-Signature': `sha256=${timestampedSig}`,
           'X-Webhook-Timestamp': timestamp,
           'X-Signature': rawBodySig,
-          'x-signature': rawBodySig,
           'X-Signature-Sha256': `sha256=${rawBodySig}`,
           'X-Webhook-Event': payload.event || 'payment.event',
           'User-Agent': 'AnonyGateway-Webhook/1.0',
