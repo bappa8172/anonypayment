@@ -93,6 +93,8 @@ export const ASSETS = {
     explorerTx: 'https://mempool.space/tx/',
     explorerAddress: 'https://mempool.space/address/',
   },
+};
+
 export const USDT_BSC = 'USDT_BSC';
 
 const CURRENCY_ALIASES = {
