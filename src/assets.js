@@ -93,12 +93,29 @@ export const ASSETS = {
     explorerTx: 'https://mempool.space/tx/',
     explorerAddress: 'https://mempool.space/address/',
   },
-};
-
 export const USDT_BSC = 'USDT_BSC';
 
+const CURRENCY_ALIASES = {
+  'USDT_TRON': 'USDT_TRC20',
+  'USDT-TRON': 'USDT_TRC20',
+  'TRON_USDT': 'USDT_TRC20',
+  'USDT-TRC20': 'USDT_TRC20',
+  'TRC20_USDT': 'USDT_TRC20',
+  'USDT_BEP20': 'USDT_BSC',
+  'USDT-BEP20': 'USDT_BSC',
+  'BEP20_USDT': 'USDT_BSC',
+  'BSC_USDT': 'USDT_BSC',
+  'BNB': 'BNB_BSC',
+  'TRON': 'USDT_TRC20',
+};
+
 export function getAsset(currency) {
-  const asset = ASSETS[currency];
+  if (!currency) {
+    throw new Error('Currency is required');
+  }
+  const normalized = String(currency).trim().toUpperCase();
+  const canonical = CURRENCY_ALIASES[normalized] || normalized;
+  const asset = ASSETS[canonical];
   if (!asset) {
     const supported = Object.keys(ASSETS).join(', ');
     throw new Error(`Unsupported currency: ${currency}. Supported: ${supported}`);

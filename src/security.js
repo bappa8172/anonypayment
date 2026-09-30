@@ -234,14 +234,19 @@ export function assertTrustedWebhookUrl(value) {
 
   const hostname = url.hostname.toLowerCase();
 
-  // Allow localhost/private IPs if explicitly in trustedWebhookHosts
-  const allowLocal = config.trustedWebhookHosts.includes('localhost') || config.trustedWebhookHosts.includes('127.0.0.1');
+  // Allow localhost/private IPs if explicitly in trustedWebhookHosts, or Docker bridge host gateway
+  const allowLocal = config.trustedWebhookHosts.includes('*') ||
+                     config.trustedWebhookHosts.includes(hostname) ||
+                     config.trustedWebhookHosts.includes('localhost') ||
+                     config.trustedWebhookHosts.includes('127.0.0.1') ||
+                     /^172\.(1[6-9]|2\d|3[01])\./.test(hostname) ||
+                     hostname === 'host.docker.internal';
+
   if (!allowLocal) {
     const blockedPatterns = [
       /^localhost$/,
       /^127\./,
       /^10\./,
-      /^172\.(1[6-9]|2\d|3[01])\./,
       /^192\.168\./,
       /^169\.254\./,
       /^0\.0\.0\.0$/,
@@ -272,7 +277,9 @@ export function assertTrustedWebhookUrl(value) {
   }
 
   if (config.trustedWebhookHosts.length > 0 && !config.trustedWebhookHosts.some(allowed => allowed === '*' || hostname === allowed || hostname.endsWith(`.${allowed}`))) {
-    throw new BadRequestError(`webhookUrl host "${hostname}" is not in WEBHOOK_ALLOWED_HOSTS allowlist`);
+    if (!allowLocal) {
+      throw new BadRequestError(`webhookUrl host "${hostname}" is not in WEBHOOK_ALLOWED_HOSTS allowlist`);
+    }
   }
 }
 
