@@ -23,14 +23,28 @@ async function emitStatusWebhook(invoice, status, txid, confirmations) {
     } catch {}
   }
 
+  let parsedMetadata = {};
+  if (invoice.metadata) {
+    try {
+      parsedMetadata = typeof invoice.metadata === 'string' ? JSON.parse(invoice.metadata) : invoice.metadata;
+    } catch {}
+  }
+
+  const finalOrderId = invoice.order_id || parsedMetadata?.orderId || null;
+  const finalTxid = txid || invoice.txid || null;
+
   await sendWebhook(invoice.webhook_url, {
     event: `invoice.${status}`,
+    id: invoice.id,
     invoice_id: invoice.id,
+    orderId: finalOrderId,
+    order_id: finalOrderId,
     status,
-    txid,
+    txid: finalTxid,
     amount: invoice.amount,
     currency: invoice.currency,
     confirmations,
+    metadata: parsedMetadata,
   }, webhookSecret);
 }
 

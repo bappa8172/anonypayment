@@ -33,9 +33,15 @@ export async function sendWebhook(url, payload, secret) {
   const timestamp = Date.now().toString();
   // Include timestamp in the signed string to prevent replay attacks
   const signaturePayload = `${timestamp}.${body}`;
-  const signature = crypto
+  const timestampedSig = crypto
     .createHmac('sha256', signingSecret)
     .update(signaturePayload)
+    .digest('hex');
+
+  // Also compute raw body HMAC signature for consumers checking x-signature directly on body
+  const rawBodySig = crypto
+    .createHmac('sha256', signingSecret)
+    .update(body)
     .digest('hex');
 
   let lastError;
@@ -48,8 +54,11 @@ export async function sendWebhook(url, payload, secret) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Webhook-Signature': `sha256=${signature}`,
+          'X-Webhook-Signature': `sha256=${timestampedSig}`,
           'X-Webhook-Timestamp': timestamp,
+          'X-Signature': rawBodySig,
+          'x-signature': rawBodySig,
+          'X-Signature-Sha256': `sha256=${rawBodySig}`,
           'X-Webhook-Event': payload.event || 'payment.event',
           'User-Agent': 'AnonyGateway-Webhook/1.0',
         },

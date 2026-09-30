@@ -36,14 +36,28 @@ async function emitStatusWebhook(invoice, status, txid, confirmations) {
     }
   }
 
+  let parsedMetadata = {};
+  if (invoice.metadata) {
+    try {
+      parsedMetadata = typeof invoice.metadata === 'string' ? JSON.parse(invoice.metadata) : invoice.metadata;
+    } catch {}
+  }
+
+  const finalOrderId = invoice.order_id || parsedMetadata?.orderId || null;
+  const finalTxid = txid || invoice.txid || null;
+
   await sendWebhook(invoice.webhook_url, {
     event: `invoice.${status}`,
+    id: invoice.id,
     invoice_id: invoice.id,
+    orderId: finalOrderId,
+    order_id: finalOrderId,
     status,
-    txid,
+    txid: finalTxid,
     amount: invoice.amount,
     currency: invoice.currency,
     confirmations,
+    metadata: parsedMetadata,
   }, webhookSecret);
 }
 
@@ -72,13 +86,15 @@ async function checkPendingInvoices() {
       if (isAtLeast(detectedBalance, requiredUnits)) {
         logger.info({ invoiceId: invoice.id, detectedBalance: detectedBalance.toString(), currency: invoice.currency }, 'On-chain payment detected for invoice');
         const head = await getBlockNumber(asset.chain);
+        const finalTxid = invoice.txid || `onchain-${invoice.address.slice(0, 10)}-${Date.now()}`;
         const status = await recordEvmPayment(invoice, {
-          txid: invoice.txid || `onchain-${invoice.address.slice(0, 10)}-${Date.now()}`,
+          txid: finalTxid,
           amountUnits: detectedBalance,
           confirmations: 1,
           raw: { detectedAt: new Date().toISOString(), balance: detectedBalance.toString(), head },
         });
-        await emitStatusWebhook(invoice, status, invoice.txid, 1);
+        invoice.txid = finalTxid;
+        await emitStatusWebhook(invoice, status, finalTxid, 1);
         if (status === 'confirmed') {
           maybeAutoSweep(invoice.id);
         }
